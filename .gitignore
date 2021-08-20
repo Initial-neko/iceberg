@@ -1,0 +1,63 @@
+*.swp
+.DS_Store
+.cache
+tmp/
+
+# intellij files
+.idea
+.idea_modules/
+*.ipr
+*.iws
+*.iml
+
+# gradle build
+.gradle
+.out/
+build
+dependencies.lock
+**/dependencies.lock
+gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# rat library install location
+lib/
+
+# web site build
+site/site
+
+# benchmark output
+spark2/benchmark/*
+!spark2/benchmark/.gitkeep
+spark3/benchmark/*
+!spark3/benchmark/.gitkeep
+
+__pycache__/
+*.py[cod]
+.eggs/
+.tox/
+env/
+venv/
+*.egg-info/
+test-reports
+build/
+dist/
+sdist/
+.coverage
+coverage.xml
+.pytest_cache/
+
+# vscode/eclipse files
+.classpath
+.project
+.settings
+bin/
+
+# Hive/metastore files
+metastore_db/
+
+# Spark/metastore files
+spark-warehouse/
+derby.log
+
+# Python stuff
+python/.mypy_cache/

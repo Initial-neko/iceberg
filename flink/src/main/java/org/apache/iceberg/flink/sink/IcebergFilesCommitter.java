@@ -26,6 +26,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.SortedMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.PartitionData;
+import org.apache.iceberg.actions.BaseRewriteDataFilesAction;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.flink.TableLoader;
+import org.apache.iceberg.flink.actions.SyncRewriteDataFilesAction;
+import org.apache.iceberg.types.Conversions;
+import static org.apache.iceberg.TableProperties.SPLIT_OPEN_FILE_COST;
+import static org.apache.iceberg.TableProperties.SPLIT_OPEN_FILE_COST_DEFAULT;
+import static org.apache.iceberg.TableProperties.WRITE_AUTO_COMPACT_FILES;
+import static org.apache.iceberg.TableProperties.WRITE_AUTO_COMPACT_FILES_DEFAULT;
+import static org.apache.iceberg.TableProperties.WRITE_TARGET_FILE_SIZE_BYTES;
+import static org.apache.iceberg.TableProperties.WRITE_TARGET_FILE_SIZE_BYTES_DEFAULT;
+
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -79,6 +96,8 @@ class IcebergFilesCommitter extends AbstractStreamOperator<Void>
   // TableLoader to load iceberg table lazily.
   private final TableLoader tableLoader;
   private final boolean replacePartitions;
+  private transient SyncRewriteDataFilesAction action;
+  private transient BaseRewriteDataFilesAction<SyncRewriteDataFilesAction> rewriteDataFilesAction;
 
   // A sorted map to maintain the completed data files for each pending checkpointId (which have not been committed
   // to iceberg table). We need a sorted map here because there's possible that few checkpoints snapshot failed, for
@@ -170,6 +189,33 @@ class IcebergFilesCommitter extends AbstractStreamOperator<Void>
 
     jobIdState.clear();
     jobIdState.add(flinkJobId);
+    if (getAutoCompactFiles(table.properties())) {
+      boolean hasNewData = false;
+      Map<String, Set<Object>> partitions = new HashMap<>();
+      for (WriteResult ckpt : writeResultsOfCurrentCkpt) {
+        if (ckpt.dataFiles().length > 0 || ckpt.deleteFiles().length > 0) {
+          hasNewData = true;
+        }
+        Arrays.stream(ckpt.dataFiles()).forEach(e -> setPartitionData(e, partitions));
+        Arrays.stream(ckpt.deleteFiles()).forEach(e -> setPartitionData(e, partitions));
+      }
+      if (hasNewData) {
+        action = new SyncRewriteDataFilesAction(table,
+                getRuntimeContext().getIndexOfThisSubtask(),
+                getRuntimeContext().getAttemptNumber());
+        rewriteDataFilesAction = action
+                .targetSizeInBytes(getTargetFileSizeBytes(table.properties()))
+                .splitOpenFileCost(getSplitOpenFileCost(table.properties()));
+
+        for (Map.Entry<String, Set<Object>> p : partitions.entrySet()) {
+          for (Object pValue : p.getValue()) {
+            rewriteDataFilesAction
+                    .filter(Expressions.equal(p.getKey(), pValue));
+          }
+        }
+      }
+    }
+
 
     // Clear the local buffer for current checkpoint.
     writeResultsOfCurrentCkpt.clear();
@@ -188,6 +234,12 @@ class IcebergFilesCommitter extends AbstractStreamOperator<Void>
     if (checkpointId > maxCommittedCheckpointId) {
       commitUpToCheckpoint(dataFilesPerCheckpoint, flinkJobId, checkpointId);
       this.maxCommittedCheckpointId = checkpointId;
+    }
+    if (rewriteDataFilesAction != null) {
+      rewriteDataFilesAction.execute();
+      if (action.getException() != null) {
+        throw action.getException();
+      }
     }
   }
 
@@ -297,8 +349,9 @@ class IcebergFilesCommitter extends AbstractStreamOperator<Void>
     }
   }
 
-  private void commitOperation(SnapshotUpdate<?> operation, int numDataFiles, int numDeleteFiles, String description,
-                               String newFlinkJobId, long checkpointId) {
+  private void commitOperation(
+          SnapshotUpdate<?> operation, int numDataFiles, int numDeleteFiles, String description,
+          String newFlinkJobId, long checkpointId) {
     LOG.info("Committing {} with {} data files and {} delete files to table {}", description, numDataFiles,
         numDeleteFiles, table);
     operation.set(MAX_COMMITTED_CHECKPOINT_ID, Long.toString(checkpointId));
@@ -308,6 +361,38 @@ class IcebergFilesCommitter extends AbstractStreamOperator<Void>
     operation.commit(); // abort is automatically called if this fails.
     long duration = System.currentTimeMillis() - start;
     LOG.info("Committed in {} ms", duration);
+  }
+  private static void setPartitionData(ContentFile file, Map<String, Set<Object>> partitions) {
+    for (int i = 0; i < file.partition().size(); i++) {
+      String partitionName = ((PartitionData) file.partition()).getPartitionType().fields().get(i).name();
+      Object partitionValue = Conversions.fromPartitionString(((PartitionData) file.partition()).getType(i),
+              ((PartitionData) file.partition()).get(i).toString());
+      if (!partitions.containsKey(partitionName)) {
+        partitions.put(partitionName, new HashSet<>());
+      }
+      partitions.get(partitionName).add(partitionValue);
+    }
+  }
+
+  private static long getTargetFileSizeBytes(Map<String, String> properties) {
+    return PropertyUtil.propertyAsLong(
+            properties,
+            WRITE_TARGET_FILE_SIZE_BYTES,
+            WRITE_TARGET_FILE_SIZE_BYTES_DEFAULT);
+  }
+
+  private static boolean getAutoCompactFiles(Map<String, String> properties) {
+    return PropertyUtil.propertyAsBoolean(
+            properties,
+            WRITE_AUTO_COMPACT_FILES,
+            WRITE_AUTO_COMPACT_FILES_DEFAULT);
+  }
+
+  private static long getSplitOpenFileCost(Map<String, String> properties) {
+    return PropertyUtil.propertyAsLong(
+            properties,
+            SPLIT_OPEN_FILE_COST,
+            SPLIT_OPEN_FILE_COST_DEFAULT);
   }
 
   @Override

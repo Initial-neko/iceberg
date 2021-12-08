@@ -60,6 +60,10 @@ allprojects {
   group = "org.apache.iceberg"
   version = getProjectVersion()
   repositories {
+    maven {
+      url 'http://maven.aliyun.com/nexus/content/groups/public/'
+      //allowInsecureProtocol = true
+    }
     mavenCentral()
     mavenLocal()
   }

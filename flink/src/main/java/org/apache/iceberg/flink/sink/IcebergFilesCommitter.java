@@ -81,6 +81,7 @@ import org.slf4j.LoggerFactory;
 class IcebergFilesCommitter extends AbstractStreamOperator<Void>
     implements OneInputStreamOperator<WriteResult, Void>, BoundedOneInput {
 
+
   private static final long serialVersionUID = 1L;
   private static final long INITIAL_CHECKPOINT_ID = -1L;
   private static final byte[] EMPTY_MANIFEST_DATA = new byte[0];

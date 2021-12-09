@@ -78,7 +78,7 @@ public class SyncRewriteDataFilesAction extends BaseRewriteDataFilesAction<SyncR
                 flinkSchema,
                 Long.MAX_VALUE,
                 format,
-                null);
+                null, false);
 
         // Initialize the task writer factory.
         this.taskWriterFactory.initialize(subTaskId, attemptId);

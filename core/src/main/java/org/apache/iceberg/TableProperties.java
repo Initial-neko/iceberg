@@ -226,4 +226,7 @@ public class TableProperties {
 
   public static final String WRITE_AUTO_COMPACT_FILES = "write.auto-compact-files";
   public static final boolean WRITE_AUTO_COMPACT_FILES_DEFAULT = false;
+
+  public static final String UPSERT_MODE_ENABLE = "write.upsert.enable";
+  public static final boolean UPSERT_MODE_ENABLE_DEFAULT = false;
 }

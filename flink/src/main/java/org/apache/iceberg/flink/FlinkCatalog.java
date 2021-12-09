@@ -499,7 +499,7 @@ public class FlinkCatalog extends AbstractCatalog {
       if (field.transform().isIdentity()) {
         partitionKeys.add(icebergSchema.findColumnName(field.sourceId()));
       } else {
-        // Not created by Flink SQL.
+        // Not created by Flink SQL.    StructProjection.java
         // For compatibility with iceberg tables, return empty.
         // TODO modify this after Flink support partition transform.
         return Collections.emptyList();

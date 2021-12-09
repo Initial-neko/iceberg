@@ -280,4 +280,55 @@ public class TestFlinkTableSink extends FlinkCatalogTestBase {
 
     sql("DROP TABLE IF EXISTS %s.%s", flinkDatabase, tableName);
   }
+
+  @Test
+  public void testPKInsert() throws Exception {
+
+    String tableName = "test_pkInsert";
+
+   /* sql("CREATE TABLE %s(id INT, data VARCHAR, PRIMARY KEY(id) NOT ENFORCED)" +
+            " with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true')", tableName);*/
+
+    sql("CREATE TABLE %s(id INT, data VARCHAR, PRIMARY KEY(id) NOT ENFORCED)" +
+            " with('write.format.default'='avro','format-version' = '2')", tableName);
+
+    Table partitionedTable = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, tableName));
+
+    sql("INSERT INTO %s SELECT 1, 'a'", tableName);
+    sql("INSERT INTO %s SELECT 2, 'b'", tableName);
+    sql("INSERT INTO %s SELECT 3, 'c'", tableName);
+
+    SimpleDataUtil.assertTableRecords(partitionedTable, Lists.newArrayList(
+            SimpleDataUtil.createRecord(1, "a"),
+            SimpleDataUtil.createRecord(2, "b"),
+            SimpleDataUtil.createRecord(3, "c")
+    ));
+
+    sql("INSERT INTO %s SELECT 1, 'm'", tableName);
+    sql("INSERT INTO %s SELECT 2, 'n'", tableName);
+    sql("INSERT INTO %s SELECT 3, 'l'", tableName);
+
+
+    getTableEnv().executeSql("select * from test_pkInsert").print();
+
+    SimpleDataUtil.assertTableRecords(partitionedTable, Lists.newArrayList(
+            SimpleDataUtil.createRecord(1, "m"),
+            SimpleDataUtil.createRecord(2, "n"),
+            SimpleDataUtil.createRecord(3, "l")
+    ));
+
+    sql("DROP TABLE IF EXISTS %s.%s", flinkDatabase, tableName);
+  }
+
+  @Test
+  public void testAlterTable() throws Exception {
+
+    String tableName = "test_alterTable";
+
+    sql("CREATE TABLE %s(id INT, data VARCHAR, PRIMARY KEY(id) NOT ENFORCED)", tableName);
+
+    sql("alter table %s SET('a' = 'b')", tableName);
+
+    sql("DROP TABLE IF EXISTS %s.%s", flinkDatabase, tableName);
+  }
 }

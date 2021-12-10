@@ -8,18 +8,9 @@
 name: "Flink CI2"
 on:
   push:
-    branches: [ test-insert ]      
-    paths-ignore:
-      - '.github/workflows/python-ci.yml'
-      - '.github/workflows/spark-ci.yml'
-      - '.github/workflows/flink-ci.yml'
-      - '.github/workflows/hive-ci.yml'
-      - '.github/workflows/cancel-duplicate-workflow-runs.yml'
-      - '.gitignore'
-      - 'dev/**'
-      - 'python/**'
-      - 'python_legacy/**'
-      - 'site/**'
+    branches:
+    - 'insert-test'
+    - 'workflow'
   workflow_dispatch:
       inputs:
             name:

@@ -8,9 +8,6 @@
 name: "Flink CI2"
 on:
   push:
-    branches:
-    - insert-test
-    - workflow
   workflow_dispatch:
       inputs:
             name:

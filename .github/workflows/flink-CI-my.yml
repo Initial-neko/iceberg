@@ -9,6 +9,9 @@ name: "Flink CI2"
 on:
   push:
     branches: [test-insert]
+  workflow_dispatch:
+    
+    
 
 jobs:
   flink-tests:

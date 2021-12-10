@@ -391,7 +391,6 @@ project(':iceberg-flink-runtime') {
 
   tasks.jar.dependsOn tasks.shadowJar
 
-
   configurations {
     compile {
       exclude group: 'org.apache.flink'

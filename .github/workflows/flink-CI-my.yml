@@ -8,6 +8,7 @@
 name: "Flink CI2"
 on:
   push:
+    branches: [master, test-insert]
     paths-ignore:
     - '.github/workflows/python-ci.yml'
     - '.github/workflows/spark-ci.yml'

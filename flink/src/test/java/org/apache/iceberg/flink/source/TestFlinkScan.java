@@ -164,6 +164,7 @@ public abstract class TestFlinkScan {
     }
     append.commit();
 
+
     // individual fields
     validateIdentityPartitionProjections(table, Collections.singletonList("dt"), inputRecords);
     validateIdentityPartitionProjections(table, Collections.singletonList("level"), inputRecords);

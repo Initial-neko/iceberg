@@ -89,7 +89,6 @@ public class TestHelpers {
     return results;
   }
 
-
   public static List<Row> readRows(FlinkInputFormat inputFormat, RowType rowType) throws IOException {
     return convertRowDataToRow(readRowData(inputFormat, rowType), rowType);
   }

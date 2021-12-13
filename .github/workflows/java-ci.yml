@@ -17,7 +17,7 @@
 # under the License.
 #
 
-name: "Java CI"
+name: "Java CI2"
 on:
   push:
     paths-ignore:
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        jvm: [8, 11]
+        jvm: [8]
     env:
       SPARK_LOCAL_IP: localhost
     steps:

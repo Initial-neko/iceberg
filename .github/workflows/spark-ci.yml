@@ -108,8 +108,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        jvm: [8, 11]
-        spark: ['3.1', '3.2']
+        jvm: [8]
+        spark: ['3.1']
+
     env:
       SPARK_LOCAL_IP: localhost
     steps:
@@ -123,10 +124,11 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: ${{ runner.os }}-gradle
       - run: echo -e "$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)\t$(hostname -f) $(hostname -s)" | sudo tee -a /etc/hosts
-      - run: ./gradlew -DsparkVersions=${{ matrix.spark }} -DhiveVersions= -DflinkVersions= :iceberg-spark:iceberg-spark-${{ matrix.spark }}:check :iceberg-spark:iceberg-spark-${{ matrix.spark }}-extensions:check :iceberg-spark:iceberg-spark-${{ matrix.spark }}-runtime:check -Pquick=true -x javadoc
+      - run: ./gradlew :iceberg-spark:check :iceberg-spark3-extensions:check :iceberg-spark-runtime:check -Pquick=true -x javadoc
       - uses: actions/upload-artifact@v2
         if: failure()
         with:
           name: test logs
           path: |
             **/build/testlogs
+

@@ -286,11 +286,8 @@ public class TestFlinkTableSink extends FlinkCatalogTestBase {
 
     String tableName = "test_pkInsert";
 
-   /* sql("CREATE TABLE %s(id INT, data VARCHAR, PRIMARY KEY(id) NOT ENFORCED)" +
-            " with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true')", tableName);*/
-
     sql("CREATE TABLE %s(id INT, data VARCHAR, PRIMARY KEY(id) NOT ENFORCED)" +
-            " with('write.format.default'='avro','format-version' = '2')", tableName);
+            " with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true')", tableName);
 
     Table partitionedTable = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, tableName));
 
@@ -309,7 +306,7 @@ public class TestFlinkTableSink extends FlinkCatalogTestBase {
     sql("INSERT INTO %s SELECT 3, 'l'", tableName);
 
 
-    getTableEnv().executeSql("select * from test_pkInsert").print();
+    //getTableEnv().executeSql("select * from test_pkInsert").print();
 
     SimpleDataUtil.assertTableRecords(partitionedTable, Lists.newArrayList(
             SimpleDataUtil.createRecord(1, "m"),

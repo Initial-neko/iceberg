@@ -1105,6 +1105,7 @@ project(":iceberg-spark3-extensions") {
     testCompile project(path: ':iceberg-hive-metastore', configuration: 'testArtifacts')
     testCompile project(path: ':iceberg-spark', configuration: 'testArtifacts')
     testCompile project(path: ':iceberg-spark3', configuration: 'testArtifacts')
+    testImplementation "org.apache.avro:avro"
 
     spark31Implementation("org.apache.spark:spark-hive_2.12:${project.ext.Spark31Version}") {
       exclude group: 'org.apache.avro', module: 'avro'

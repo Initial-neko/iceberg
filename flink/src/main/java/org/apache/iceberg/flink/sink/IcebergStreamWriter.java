@@ -70,6 +70,7 @@ class IcebergStreamWriter<T> extends AbstractStreamOperator<WriteResult>
   @Override
   public void processElement(StreamRecord<T> element) throws Exception {
     writer.write(element.getValue());
+
   }
 
   @Override

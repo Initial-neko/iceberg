@@ -35,6 +35,7 @@ import org.apache.iceberg.relocated.com.google.common.base.MoreObjects;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Iterables;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
+import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.util.CharSequenceSet;
 import org.apache.iceberg.util.StructLikeMap;
 import org.apache.iceberg.util.StructProjection;
@@ -52,6 +53,7 @@ public abstract class BaseTaskWriter<T> implements TaskWriter<T> {
   private final FileIO io;
   private final long targetFileSize;
 
+
   protected BaseTaskWriter(PartitionSpec spec, FileFormat format, FileAppenderFactory<T> appenderFactory,
                            OutputFileFactory fileFactory, FileIO io, long targetFileSize) {
     this.spec = spec;
@@ -64,6 +66,11 @@ public abstract class BaseTaskWriter<T> implements TaskWriter<T> {
 
   protected PartitionSpec spec() {
     return spec;
+  }
+
+  public String location() {
+    String path = fileFactory.locations().newDataLocation("");
+    return path.substring(0, path.length() - 6);
   }
 
   @Override
@@ -114,6 +121,10 @@ public abstract class BaseTaskWriter<T> implements TaskWriter<T> {
      */
     protected abstract StructLike asStructLike(T data);
 
+    public String getLocation(){
+      return location();
+    }
+
     public void write(T row) throws IOException {
       PathOffset pathOffset = PathOffset.of(dataWriter.currentPath(), dataWriter.currentRows());
 
@@ -126,7 +137,6 @@ public abstract class BaseTaskWriter<T> implements TaskWriter<T> {
         // TODO attach the previous row if has a positional-delete row schema in appender factory.
         posDeleteWriter.delete(previous.path, previous.rowOffset, null);
       }
-
       dataWriter.write(row);
     }
 

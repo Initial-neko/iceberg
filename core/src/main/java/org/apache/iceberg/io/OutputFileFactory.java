@@ -104,6 +104,10 @@ public class OutputFileFactory {
     this.operationId = operationId;
   }
 
+  public LocationProvider locations(){
+    return this.locations;
+  }
+
   public static Builder builderFor(Table table, int partitionId, long taskId) {
     return new Builder(table, partitionId, taskId);
   }

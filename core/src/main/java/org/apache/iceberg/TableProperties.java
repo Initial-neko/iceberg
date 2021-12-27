@@ -229,4 +229,7 @@ public class TableProperties {
 
   public static final String UPSERT_MODE_ENABLE = "write.upsert.enable";
   public static final boolean UPSERT_MODE_ENABLE_DEFAULT = false;
+
+  public static final String UPSERT_PART_ENABLE = "write.upsert-part.enable";
+  public static final boolean UPSERT_PART_ENABLE_DEFAULT = false;
 }

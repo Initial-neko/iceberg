@@ -328,10 +328,12 @@ project(':iceberg-flink') {
     compileOnly "org.apache.flink:flink-streaming-java_2.12:${project.ext.flinkVersion}"
     compileOnly "org.apache.flink:flink-streaming-java_2.12:${project.ext.flinkVersion}:tests"
     compileOnly "org.apache.flink:flink-table-api-java-bridge_2.12:${project.ext.flinkVersion}"
+    compileOnly "org.apache.flink:flink-runtime-web_2.12:${project.ext.flinkVersion}"
     compileOnly "org.apache.flink:flink-table-planner-blink_2.12:${project.ext.flinkVersion}"
     compileOnly "org.apache.flink:flink-table-planner_2.12:${project.ext.flinkVersion}"
     compileOnly "org.apache.hadoop:hadoop-hdfs"
     compileOnly "org.apache.hadoop:hadoop-common"
+
     compileOnly("org.apache.hadoop:hadoop-minicluster") {
       exclude group: 'org.apache.avro', module: 'avro'
     }

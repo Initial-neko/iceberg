@@ -36,6 +36,10 @@ import org.apache.iceberg.io.TaskWriter;
 import org.apache.iceberg.io.UnpartitionedWriter;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.util.ArrayUtil;
+import org.apache.iceberg.util.PropertyUtil;
+
+import static org.apache.iceberg.TableProperties.UPSERT_PART_ENABLE;
+import static org.apache.iceberg.TableProperties.UPSERT_PART_ENABLE_DEFAULT;
 
 public class RowDataTaskWriterFactory implements TaskWriterFactory<RowData> {
   private final Table table;
@@ -96,12 +100,14 @@ public class RowDataTaskWriterFactory implements TaskWriterFactory<RowData> {
       }
     } else {
       // Initialize a task writer to write both INSERT and equality DELETE.
+      boolean upsertPart = PropertyUtil.propertyAsBoolean(table.properties(),
+              UPSERT_PART_ENABLE, UPSERT_PART_ENABLE_DEFAULT);
       if (spec.isUnpartitioned()) {
         return new UnpartitionedDeltaWriter(spec, format, appenderFactory, outputFileFactory, io,
-            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert);
+            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert, upsertPart);
       } else {
         return new PartitionedDeltaWriter(spec, format, appenderFactory, outputFileFactory, io,
-            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert);
+            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert, upsertPart);
       }
     }
   }

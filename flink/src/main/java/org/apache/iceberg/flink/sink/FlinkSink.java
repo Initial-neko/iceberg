@@ -361,6 +361,7 @@ public class FlinkSink {
       }
       IcebergStreamWriter<RowData> streamWriter = createStreamWriter(table, flinkRowType, equalityFieldIds, upsertMode);
 
+
       int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
       SingleOutputStreamOperator<WriteResult> writerStream = input
           .transform(operatorName(ICEBERG_STREAM_WRITER_NAME), TypeInformation.of(WriteResult.class), streamWriter)

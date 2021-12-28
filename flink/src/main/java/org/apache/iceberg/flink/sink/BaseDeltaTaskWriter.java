@@ -134,6 +134,8 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
             newRow.setField(i, newValue);
           }
           row = newRow;
+          //更新缓存，下次如果还在id范围内进行更新，可以获取到最新的上一次的行
+          map.put(ids, row);
         }
       }
     }catch (Exception e){

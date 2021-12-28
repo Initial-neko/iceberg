@@ -21,33 +21,32 @@ package org.apache.iceberg.flink.sink;
 
 import java.io.IOException;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
-import org.apache.flink.streaming.api.datastream.DataStream;
+import java.util.List;
+
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.CloseableIterator;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.StructLike;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.data.IcebergGenerics;
+import org.apache.iceberg.data.Record;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.flink.RowDataWrapper;
 import org.apache.iceberg.flink.TableLoader;
-import org.apache.iceberg.flink.source.FlinkSource;
 import org.apache.iceberg.io.BaseTaskWriter;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppenderFactory;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFileFactory;
-import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
@@ -60,8 +59,7 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
   private final boolean upsert;
   private final boolean upsertPart;
   private StreamExecutionEnvironment env = null;
-  private Map<Integer, RowData> map = Maps.newHashMapWithExpectedSize(1000);
-  private int left = -1, right = -1;
+  private Table table = null;
 
   BaseDeltaTaskWriter(PartitionSpec spec,
                       FileFormat format,
@@ -92,54 +90,45 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
   @Override
   public void write(RowData row) throws IOException {
     RowDataDeltaWriter writer = route(row);
-    RowData raw = null;
+    Record raw = null;
 
     try {
       Types.NestedField id = deleteSchema.caseInsensitiveFindField("id");
       int fieldId = id.fieldId();
       if (upsertPart) {
         int ids = row.getInt(fieldId - 1);
-        if (!map.containsKey(ids) && (ids > right || ids < left)) {
-          System.out.println("map is not cached!!!!~~~~~");
-          int size = 1000;
-          int from = ids;
-          int end = ids + size;
-          left = ids; right = end - 1;
-          Expression expression = Expressions.and(Expressions.greaterThanOrEqual("id", from), Expressions.lessThan("id", end));
-
-          DataStream<RowData> dataStream = FlinkSource.forRowData()
-                  .env(env)
-                  .streaming(false)
-                  .tableLoader(TableLoader.fromHadoopTable(writer.getLocation()))
-                  .filters(Collections.singletonList(expression))
-                  .build();
-          CloseableIterator<RowData> iterator = dataStream.executeAndCollect();
-          while (iterator.hasNext()) {
-            RowData row1 = iterator.next();
-            map.put(row1.getInt(fieldId - 1), row1);
-          }
-          System.out.println("added map: " + map);
+        Expression expression = Expressions.equal("id", ids);
+        if(table == null) {
+          String loc = writer.getLocation();
+          TableLoader loader = TableLoader.fromHadoopTable(loc);
+          loader.open();
+          table = loader.loadTable();
         }
-        //如果此处依然获取不到，那么按照原行插入
-        raw = map.getOrDefault(ids, null);
+        CloseableIterable<Record> iterable = IcebergGenerics
+                .read(table)
+                .where(expression)
+                .build();
+        //由于主键的设置，此处应该只有一条数据,直接赋值即可
+        for (Record record : iterable) {
+          raw = record;
+        }
         if(raw != null) {
           GenericRowData newRow = new GenericRowData(row.getRowKind(), row.getArity());
           RowType rowType = FlinkSchemaUtil.convert(schema);
           for (int i = 0; i < row.getArity(); i++) {
             LogicalType type = rowType.getTypeAt(i);
             RowData.FieldGetter getter = RowData.createFieldGetter(type, i);
-            Object rawVal = getter.getFieldOrNull(raw);
+            Object rawVal = raw.get(i);
             Object rowVal = getter.getFieldOrNull(row);
             Object newValue = rowVal != null ? rowVal : rawVal;
             newRow.setField(i, newValue);
           }
           row = newRow;
-          //更新缓存，下次如果还在id范围内进行更新，可以获取到最新的上一次的行
-          map.put(ids, row);
         }
+//        System.out.println("raw: "+ raw + " row" + row);
       }
     }catch (Exception e){
-      System.out.println("********* get record error");
+      System.out.println("******** get record error");
       e.printStackTrace();
     }
     switch (row.getRowKind()) {

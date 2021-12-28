@@ -17,6 +17,7 @@ package org.apache.iceberg.flink;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
@@ -66,6 +67,7 @@ public class myFlinkTest {
         env.setParallelism(1);
 //flink写入iceberg需要打开checkpoint
         env.enableCheckpointing(60000);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 1000));
         tenv = StreamTableEnvironment.create(env);
         tenv.executeSql("create CATALOG iceberg_hadoop_catalog with" +
                 "('type'='iceberg','catalog-type'='hadoop'," +
@@ -108,6 +110,7 @@ public class myFlinkTest {
         System.out.println("***************** " + random + " " + random2);*/
         System.out.println("***************** " + random);
         tenv.executeSql("insert into iceberg_insert(id,data1) values(1,"+random+")");
+        tenv.executeSql("insert into iceberg_insert(id,data1) values(1,8)");
         Thread.sleep(10000);
         tenv.executeSql("select * from iceberg_insert ").print();
     }
@@ -117,6 +120,7 @@ public class myFlinkTest {
      */
     @Test
     public void testMultipleLines() throws InterruptedException {
+        tenv.executeSql("alter table iceberg_insert set('write.upsert-part.enable'='true')");
         StringBuilder str = new StringBuilder();
         String sql = "insert into iceberg_insert values";
         for(int i = 0; i < 1000; i++){
@@ -141,14 +145,15 @@ public class myFlinkTest {
     public void testMultipleLines_insert2() throws InterruptedException {
         StringBuilder str = new StringBuilder();
         String sql = "insert into iceberg_insert(id,data1) values";
-        for(int i = 0; i < 1000; i++){
+        for(int i = 1000; i < 1100; i++){
             int id= i;
-            int data1 = (int)Math.random() * 10000;
+            int data1 = (int)(Math.random() * 100000) + 1000;
             str.append("("+id+","+data1+")");
             str.append(",");
         }
         String str2 = str.toString();
         str2 = str2.substring(0, str2.length() - 1);
+        System.out.println(str2);
         sql = sql + str2;
         System.out.println(sql);
         tenv.executeSql(sql);
@@ -187,28 +192,38 @@ public class myFlinkTest {
 
     @Test
     public void officaltest1Open() throws IOException, InterruptedException {
-        tenv.executeSql("CREATE TABLE IF NOT EXISTS iceberg_insert3(" +
-                "  `id`  INT NOT NULL," +
-                "  `data1`   INT," +
-                "  `data2`   INT," +
-                "  PRIMARY KEY(id) NOT ENFORCED" +
-                ") with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true','write.metadata.delete-after-commit.enabled'='true'," +
-                "'write.metadata.previous-versions-max'='5','flink.max-continuous-empty-commits'='50','write.upsert-part.enable'='true')");
+        try {
+            tenv.executeSql("CREATE TABLE IF NOT EXISTS iceberg_insert3(" +
+                    "  `id`  INT NOT NULL," +
+                    "  `data1`   INT," +
+                    "  `data2`   INT," +
+                    "  PRIMARY KEY(id) NOT ENFORCED" +
+                    ") with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true','write.metadata.delete-after-commit.enabled'='true'," +
+                    "'write.metadata.previous-versions-max'='5','flink.max-continuous-empty-commits'='50','write.upsert-part.enable'='true')");
 
-        tenv.executeSql("insert into iceberg_insert3 values(1,2,3),(2,3,4),(3,4,5)");
-        Thread.sleep(10000);
-        tenv.executeSql("insert into iceberg_insert3(id, data1) values(1,3),(2,4),(3,5)");
+            tenv.executeSql("insert into iceberg_insert3 values(1,2,3),(2,3,4),(3,4,5)");
+            Thread.sleep(10000);
+            tenv.executeSql("insert into iceberg_insert3(id, data1) values(1,8),(2,9),(3,10)");
+//            tenv.executeSql("insert into iceberg_insert3(id, data2) values(1,88),(2,99),(3,100)");
+            tenv.executeSql("insert into iceberg_insert3(id, data1) values(1,3),(2,4),(3,5)");
+//            tenv.executeSql("insert into iceberg_insert3(id, data2) values(1,30),(2,40),(3,50)");
 
-        Thread.sleep(10000);
-        HadoopCatalog catalog = getCatalog();
-        Table table = catalog.loadTable(TableIdentifier.of(database, "iceberg_insert3"));
-        // Assert the table records as expected.
-        SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
-                createRecord(1, 3,3),
-                createRecord(2, 4,4),
-                createRecord(3, 5,5)
-        ));
-        tenv.executeSql("drop table iceberg_insert3");
+            Thread.sleep(10000);
+            HadoopCatalog catalog = getCatalog();
+            Table table = catalog.loadTable(TableIdentifier.of(database, "iceberg_insert3"));
+            // Assert the table records as expected.
+            SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
+                    createRecord(1, 3,88),
+                    createRecord(2, 4,99),
+                    createRecord(3, 5,100)
+            ));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            tenv.executeSql("drop table iceberg_insert3");
+        }
     }
     @Test
     public void officaltest2Close() throws IOException, InterruptedException {
@@ -233,6 +248,78 @@ public class myFlinkTest {
                 createRecord(3, 5,null)
         ));
         tenv.executeSql("drop table iceberg_insert4");
+    }
+
+    @Test
+    public void officaltest3_multiple_same_key() throws IOException, InterruptedException {
+        String tableName = "iceberg_insert5";
+        tenv.executeSql("CREATE TABLE IF NOT EXISTS "+tableName+"(" +
+                "  `id`  INT NOT NULL," +
+                "  `data1`   INT," +
+                "  `data2`   INT," +
+                "  PRIMARY KEY(id) NOT ENFORCED" +
+                ") with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true','write.metadata.delete-after-commit.enabled'='true'," +
+                "'write.metadata.previous-versions-max'='5','flink.max-continuous-empty-commits'='50','write.upsert-part.enable'='true')");
+
+        tenv.executeSql("insert into "+tableName+" values(1,2,3),(2,3,4),(3,4,5)");
+        Thread.sleep(10000);
+        for(int ii = 0; ii <= 3; ii++) {
+            String sql = "insert into "+tableName+"(id,data2) values";
+            StringBuilder str = new StringBuilder();
+            for(int i = 0; i < 4; i++){
+                int id= i;
+                int data1 = (int)(Math.random() * 100) + 1000;
+                str.append("("+id+","+data1+")");
+                str.append(",");
+            }
+            String str2 = str.toString();
+            str2 = str2.substring(0, str2.length() - 1);
+            sql = sql + str2;
+            tenv.executeSql(sql);
+            Thread.sleep(5000);
+        }
+
+        Thread.sleep(10000);
+        HadoopCatalog catalog = getCatalog();
+        Table table = catalog.loadTable(TableIdentifier.of(database, tableName));
+        // Assert the table records as expected.
+        SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
+                createRecord(1, 5,3),
+                createRecord(2, 3,4),
+                createRecord(3, 4,5)
+        ));
+        //tenv.executeSql("drop table "+tableName+"");
+    }
+
+    @Test
+    public void testMultipleLines_insert_offical() throws InterruptedException {
+        String tableName = "iceberg_insert6";
+        tenv.executeSql("CREATE TABLE IF NOT EXISTS "+tableName+"(" +
+                "  `id`  INT NOT NULL," +
+                "  `data1`   INT," +
+                "  `data2`   INT," +
+                "  PRIMARY KEY(id) NOT ENFORCED" +
+                ") with('write.format.default'='avro','format-version' = '2','write.upsert.enable'='true','write.metadata.delete-after-commit.enabled'='true'," +
+                "'write.metadata.previous-versions-max'='5','flink.max-continuous-empty-commits'='50','write.upsert-part.enable'='true')");
+
+        String sql = "insert into iceberg_insert(id,data2) values";
+        StringBuilder str = new StringBuilder();
+        for(int i = 1000; i < 1100; i++){
+            int id= i;
+            int data1 = (int)(Math.random() * 100) + 1000;
+            str.append("("+id+","+data1+")");
+            str.append(",");
+        }
+        String str2 = str.toString();
+        str2 = str2.substring(0, str2.length() - 1);
+        System.out.println(str2);
+        sql = sql + str2;
+        System.out.println(sql);
+        tenv.executeSql(sql);
+        Thread.sleep(10000);
+        tenv
+                .executeSql("select * from "+tableName+" /*+ OPTIONS('streaming'='true', 'monitor-interval'='5s')*/")
+                .print();
     }
 
 

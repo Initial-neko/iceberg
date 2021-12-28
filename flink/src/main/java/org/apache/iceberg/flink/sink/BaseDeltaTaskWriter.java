@@ -41,7 +41,6 @@ import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.flink.RowDataWrapper;
-import org.apache.iceberg.flink.TableLoader;
 import org.apache.iceberg.io.BaseTaskWriter;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppenderFactory;
@@ -49,7 +48,6 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFileFactory;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.iceberg.types.TypeUtil;
-import org.apache.iceberg.types.Types;
 
 abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
 
@@ -71,7 +69,8 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
                       RowType flinkSchema,
                       List<Integer> equalityFieldIds,
                       boolean upsert,
-                      boolean upsertPart) {
+                      boolean upsertPart,
+                      Table table) {
     super(spec, format, appenderFactory, fileFactory, io, targetFileSize);
     this.schema = schema;
     this.deleteSchema = TypeUtil.select(schema, Sets.newHashSet(equalityFieldIds));
@@ -79,6 +78,7 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
     this.upsert = upsert;
     this.env = StreamExecutionEnvironment.getExecutionEnvironment();
     this.upsertPart = upsertPart;
+    this.table = table;
   }
 
   abstract RowDataDeltaWriter route(RowData row);
@@ -100,12 +100,7 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
         int ids = row.getInt(0);
         String key_name = schema.findColumnName(1);
         Expression expression = Expressions.equal(key_name, ids);
-        if(table == null) {
-          String loc = writer.getLocation();
-          TableLoader loader = TableLoader.fromHadoopTable(loc);
-          loader.open();
-          table = loader.loadTable();
-        }
+
         CloseableIterable<Record> iterable = IcebergGenerics
                 .read(table)
                 .where(expression)

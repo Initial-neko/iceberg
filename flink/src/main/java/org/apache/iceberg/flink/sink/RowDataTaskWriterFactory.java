@@ -104,10 +104,10 @@ public class RowDataTaskWriterFactory implements TaskWriterFactory<RowData> {
               UPSERT_PART_ENABLE, UPSERT_PART_ENABLE_DEFAULT);
       if (spec.isUnpartitioned()) {
         return new UnpartitionedDeltaWriter(spec, format, appenderFactory, outputFileFactory, io,
-            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert, upsertPart);
+            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert, upsertPart, table);
       } else {
         return new PartitionedDeltaWriter(spec, format, appenderFactory, outputFileFactory, io,
-            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert, upsertPart);
+            targetFileSizeBytes, schema, flinkSchema, equalityFieldIds, upsert, upsertPart, table);
       }
     }
   }

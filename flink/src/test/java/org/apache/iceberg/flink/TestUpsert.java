@@ -57,28 +57,20 @@ public class TestUpsert extends FlinkCatalogTestBase {
     private TableEnvironment tEnv;
     private Table icebergTable;
 
-    private final FileFormat format;
-    private final boolean isStreamingJob;
-
-    @Parameterized.Parameters(name = "catalogName={0}, baseNamespace={1}, format={2}, isStreaming={3}")
+    @Parameterized.Parameters(name = "catalogName={0}, baseNamespace={1}")
     public static Iterable<Object[]> parameters() {
         List<Object[]> parameters = Lists.newArrayList();
-        for (FileFormat format : new FileFormat[]{FileFormat.ORC, FileFormat.AVRO, FileFormat.PARQUET}) {
-            for (Boolean isStreaming : new Boolean[]{true, false}) {
-                for (Object[] catalogParams : FlinkCatalogTestBase.parameters()) {
-                    String catalogName = (String) catalogParams[0];
-                    Namespace baseNamespace = (Namespace) catalogParams[1];
-                    parameters.add(new Object[]{catalogName, baseNamespace, format, isStreaming});
-                }
-            }
+
+        for (Object[] catalogParams : FlinkCatalogTestBase.parameters()) {
+            String catalogName = (String) catalogParams[0];
+            Namespace baseNamespace = (Namespace) catalogParams[1];
+            parameters.add(new Object[]{catalogName, baseNamespace});
         }
         return parameters;
     }
 
-    public TestUpsert(String catalogName, Namespace baseNamespace, FileFormat format, Boolean isStreamingJob) {
+    public TestUpsert(String catalogName, Namespace baseNamespace) {
         super(catalogName, baseNamespace);
-        this.format = format;
-        this.isStreamingJob = isStreamingJob;
     }
 
     @Override
@@ -88,19 +80,15 @@ public class TestUpsert extends FlinkCatalogTestBase {
                 EnvironmentSettings.Builder settingsBuilder = EnvironmentSettings
                         .newInstance()
                         .useBlinkPlanner();
-                if (isStreamingJob) {
-                    settingsBuilder.inStreamingMode();
-                    StreamExecutionEnvironment env = StreamExecutionEnvironment
-                            .getExecutionEnvironment(MiniClusterResource.DISABLE_CLASSLOADER_CHECK_CONFIG);
-                    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-                    env.enableCheckpointing(400);
-                    env.setMaxParallelism(2);
-                    env.setParallelism(2);
-                    tEnv = StreamTableEnvironment.create(env, settingsBuilder.build());
-                } else {
-                    settingsBuilder.inBatchMode();
-                    tEnv = TableEnvironment.create(settingsBuilder.build());
-                }
+                settingsBuilder.inStreamingMode();
+                StreamExecutionEnvironment env = StreamExecutionEnvironment
+                        .getExecutionEnvironment(MiniClusterResource.DISABLE_CLASSLOADER_CHECK_CONFIG);
+                env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+                env.enableCheckpointing(400);
+                env.setMaxParallelism(2);
+                env.setParallelism(2);
+                tEnv = StreamTableEnvironment.create(env, settingsBuilder.build());
+
             }
         }
         return tEnv;
@@ -112,8 +100,8 @@ public class TestUpsert extends FlinkCatalogTestBase {
         sql("CREATE DATABASE %s", flinkDatabase);
         sql("USE CATALOG %s", catalogName);
         sql("USE %s", DATABASE);
-        sql("CREATE TABLE %s (id int, data1 int, data2 int) " +
-                "with ('write.format.default'='%s','write.upsert-part.enable'='true')", TABLE_NAME, format.name());
+        sql("CREATE TABLE %s (id int, data1 int, data2 int ,PRIMARY KEY(id) NOT ENFORCED) " +
+                "with('format-version' = '2','write.upsert.enable'='true','write.upsert-part.enable'='true')", TABLE_NAME);
         icebergTable = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, TABLE_NAME));
     }
 
@@ -145,7 +133,7 @@ public class TestUpsert extends FlinkCatalogTestBase {
 
         sql("insert into %s values(1,2,3),(2,3,4),(3,4,5)", TABLE_NAME);
 
-        sql("insert into %s((id, data1) values(1,8),(2,9),(3,10)", TABLE_NAME);
+        sql("insert into %s(id, data1) values(1,8),(2,9),(3,10)", TABLE_NAME);
 
         SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
                 createRecord(1, 8,3),
@@ -153,7 +141,7 @@ public class TestUpsert extends FlinkCatalogTestBase {
                 createRecord(3, 10,5)
         ));
 
-        sql("insert into %s((id, data2) values(1,30),(2,40),(3,50)", TABLE_NAME);
+        sql("insert into %s(id, data2) values(1,30),(2,40),(3,50)", TABLE_NAME);
 
         // Assert the table records as expected.
         SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(

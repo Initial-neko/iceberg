@@ -68,11 +68,6 @@ public abstract class BaseTaskWriter<T> implements TaskWriter<T> {
     return spec;
   }
 
-  public String location() {
-    String path = fileFactory.locations().newDataLocation("");
-    return path.substring(0, path.length() - 6);
-  }
-
   @Override
   public void abort() throws IOException {
     close();
@@ -120,10 +115,6 @@ public abstract class BaseTaskWriter<T> implements TaskWriter<T> {
      * Wrap the data as a {@link StructLike}.
      */
     protected abstract StructLike asStructLike(T data);
-
-    public String getLocation(){
-      return location();
-    }
 
     public void write(T row) throws IOException {
       PathOffset pathOffset = PathOffset.of(dataWriter.currentPath(), dataWriter.currentRows());

@@ -93,11 +93,13 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
     Record raw = null;
 
     try {
-      Types.NestedField id = deleteSchema.caseInsensitiveFindField("id");
-      int fieldId = id.fieldId();
+      /*Types.NestedField id = deleteSchema.caseInsensitiveFindField("id");
+      int fieldId = id.fieldId();*/
       if (upsertPart) {
-        int ids = row.getInt(fieldId - 1);
-        Expression expression = Expressions.equal("id", ids);
+        //主键字段放在schema的第一个位置，以后可以扩增，schema中信息很丰富
+        int ids = row.getInt(0);
+        String key_name = schema.findColumnName(1);
+        Expression expression = Expressions.equal(key_name, ids);
         if(table == null) {
           String loc = writer.getLocation();
           TableLoader loader = TableLoader.fromHadoopTable(loc);
@@ -125,7 +127,7 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
           }
           row = newRow;
         }
-//        System.out.println("raw: "+ raw + " row" + row);
+        System.out.println("raw: "+ raw + " row" + row);
       }
     }catch (Exception e){
       System.out.println("******** get record error");

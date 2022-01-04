@@ -120,9 +120,10 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
             Object newValue = rowVal != null ? rowVal : rawVal;
             newRow.setField(i, newValue);
           }
+          System.out.println("raw: "+ raw + " row " + row + " newrow " + newRow);
           row = newRow;
         }
-        System.out.println("raw: "+ raw + " row" + row);
+
       }
     }catch (Exception e){
       System.out.println("******** get record error");

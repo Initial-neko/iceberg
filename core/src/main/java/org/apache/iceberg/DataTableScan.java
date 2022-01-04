@@ -68,6 +68,16 @@ public class DataTableScan extends BaseTableScan {
   }
 
   @Override
+  public TableScan appendsCurrent(long snapshotId) {
+    final Snapshot currentSnapshot = table().currentSnapshot();
+    Preconditions.checkState(currentSnapshot != null,
+            "Cannot scan appends for %s, there is no snapshot", snapshotId);
+    return new StreamIncrementalDataTableScan(tableOps(), table(), schema(),
+            context().useSnapshotId(snapshotId));
+  }
+
+
+  @Override
   public CloseableIterable<FileScanTask> planFiles(TableOperations ops, Snapshot snapshot,
                                                    Expression rowFilter, boolean ignoreResiduals,
                                                    boolean caseSensitive, boolean colStats) {

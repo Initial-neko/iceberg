@@ -32,6 +32,7 @@ import org.apache.iceberg.data.Record;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.SnapshotUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -143,11 +144,38 @@ public class TestUpsert extends FlinkCatalogTestBase {
 
         sql("insert into %s(id, data2) values(1,30),(2,40),(3,50)", TABLE_NAME);
 
+        System.out.println(SnapshotUtil.currentAncestors(table));
         // Assert the table records as expected.
         SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
                 createRecord(1, 8,30),
                 createRecord(2, 9,40),
                 createRecord(3, 10,50)
+        ));
+
+    }
+
+    @Test
+    public void TestWithOneInsertChangeTwice() throws IOException, InterruptedException {
+
+        Table table = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, TABLE_NAME));
+
+        sql("insert into %s values(1,2,3),(2,3,4),(3,4,5)", TABLE_NAME);
+
+        sql("insert into %s(id, data1) values(1,8),(1,9),(2,10),(2,11),(3,23)", TABLE_NAME);
+
+        SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
+                createRecord(1, 9, 3),
+                createRecord(2, 11, 4),
+                createRecord(3, 23, 5)
+        ));
+
+        sql("insert into %s(id, data2) values(1,30),(1,40),(2,50),(2,60),(3,12),(3,13)", TABLE_NAME);
+
+        // Assert the table records as expected.
+        SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
+                createRecord(1, 9, 40),
+                createRecord(2, 11, 60),
+                createRecord(3, 23, 13)
         ));
 
     }

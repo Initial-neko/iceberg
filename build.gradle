@@ -70,7 +70,7 @@ allprojects {
   project.ext {
     Spark30Version = '3.0.3'
     Spark31Version = '3.1.1'
-    flinkVersion = '1.13.3'
+    flinkVersion = '1.13.1'
   }
 }
 

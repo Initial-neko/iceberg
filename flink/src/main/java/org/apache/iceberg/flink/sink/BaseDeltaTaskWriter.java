@@ -24,9 +24,11 @@ import java.io.IOException;
 
 import java.util.List;
 
+import java.util.Set;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.binary.BinaryStringData;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.iceberg.FileFormat;
@@ -93,13 +95,27 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
     Record raw = null;
 
     try {
-      /*Types.NestedField id = deleteSchema.caseInsensitiveFindField("id");
-      int fieldId = id.fieldId();*/
+
       if (upsertPart) {
         //主键字段放在schema的第一个位置，以后可以扩增，schema中信息很丰富
-        int ids = row.getInt(0);
-        String key_name = schema.findColumnName(1);
-        Expression expression = Expressions.equal(key_name, ids);
+        Set<Integer> fieldIds = table.schema().identifierFieldIds();
+        Expression expression = Expressions.alwaysTrue();
+
+        RowType rowType = FlinkSchemaUtil.convert(schema);
+        RowData.FieldGetter[] getters = new RowData.FieldGetter[row.getArity()];
+        for (int i = 0; i < row.getArity(); i++) {
+          LogicalType type = rowType.getTypeAt(i);
+          getters[i] = RowData.createFieldGetter(type, i);
+        }
+
+        for(Integer fieldId: fieldIds) {
+          Object fieldVal = getters[fieldId - 1].getFieldOrNull(row);
+          String fieldName = schema.findColumnName(fieldId);
+          if(fieldVal instanceof BinaryStringData){
+            fieldVal = fieldVal.toString();
+          }
+          expression = Expressions.and(expression, Expressions.equal(fieldName, fieldVal));
+        }
 
         CloseableIterable<Record> iterable = IcebergGenerics
                 .read(table)
@@ -111,16 +127,13 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
         }
         if(raw != null) {
           GenericRowData newRow = new GenericRowData(row.getRowKind(), row.getArity());
-          RowType rowType = FlinkSchemaUtil.convert(schema);
           for (int i = 0; i < row.getArity(); i++) {
-            LogicalType type = rowType.getTypeAt(i);
-            RowData.FieldGetter getter = RowData.createFieldGetter(type, i);
             Object rawVal = raw.get(i);
-            Object rowVal = getter.getFieldOrNull(row);
+            Object rowVal = getters[i].getFieldOrNull(row);
             Object newValue = rowVal != null ? rowVal : rawVal;
             newRow.setField(i, newValue);
           }
-          System.out.println("raw: "+ raw + " row " + row + " newrow " + newRow);
+//          System.out.println("raw: "+ raw + " row " + row + " newrow " + newRow);
           row = newRow;
         }
 

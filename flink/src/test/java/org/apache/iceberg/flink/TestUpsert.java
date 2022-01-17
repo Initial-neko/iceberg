@@ -88,7 +88,7 @@ public class TestUpsert extends FlinkCatalogTestBase {
                 StreamExecutionEnvironment env = StreamExecutionEnvironment
                         .getExecutionEnvironment(MiniClusterResource.DISABLE_CLASSLOADER_CHECK_CONFIG);
                 env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-                env.enableCheckpointing(300);
+                env.enableCheckpointing(10000);
                 env.setMaxParallelism(2);
                 env.setParallelism(2);
                 tEnv = StreamTableEnvironment.create(env, settingsBuilder.build());

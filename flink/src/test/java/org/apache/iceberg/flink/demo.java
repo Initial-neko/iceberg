@@ -46,30 +46,32 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class demo {
+
     StreamExecutionEnvironment env = null;
     StreamTableEnvironment tenv = null;
-    String database = "hdp_teu_dpd_default_stream_db1";
+    String database = "hdp_lbg_supin_lakehouse";
     HiveCatalog catalog = null;
-    String warehouse = "hdfs://10.162.12.100:9000/home/hdp_teu_dpd/resultdata/ly60/iceberg/warehouse/hive_catalog";
-    String TABLE_NAME;
+    String warehouse = "hdfs://10.162.12.100:9000/home/lakehouse/iceberg";
+    String TABLE_NAME = "test_db";
 
     @Before
     public void init() {
-        System.setProperty("HADOOP_USER_NAME", "hdp_teu_dpd");
+        System.setProperty("HADOOP_USER_NAME", "hdp_lbg_supin");
+        System.out.println(System.getProperty("HADOOP_USER_NAME") + " " + System.getenv("HADOOP_USER_NAME"));
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         org.apache.flink.configuration.Configuration conf = new org.apache.flink.configuration.Configuration();
         conf.setString("rest.port", "8081-8089");
         env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
         env.setParallelism(1);
         //flink写入iceberg需要打开checkpoint
-        env.enableCheckpointing(10000);
+        env.enableCheckpointing(500);
 
         tenv = StreamTableEnvironment.create(env);
         tenv.executeSql("create CATALOG iceberg_hive_catalog with" +
                 "('type'='iceberg','catalog-type'='hive','uri'='thrift://10.162.12.69:9083'," +
                 "'warehouse'='" + warehouse + "')");
         tenv.useCatalog("iceberg_hive_catalog");
-        tenv.useDatabase("hdp_teu_dpd_default_stream_db1");
+        tenv.useDatabase(database);
         org.apache.flink.configuration.Configuration configuration = tenv.getConfig()
                 .getConfiguration();
 
@@ -97,21 +99,27 @@ public class demo {
         return hiveCatalog;
     }
 
+    @Test
+    public void test2(){
+        System.out.println(123213);
+    }
+
     /**
      * 测试建表以及插入参数， format-version选择2，upsert模式需要打开，部分字段模式开启，为三个测试中的主要参数（建表时需要保证有主键）
      * 建表的时候，可以设置任意主键和分区字段
      */
     @Test
     public void test_createAndInsert() {
-
-        tenv.executeSql("CREATE TABLE IF NOT EXISTS iceberg_insert2(" +
+//        System.setProperty("HADOOP_USER_NAME", "hdp_lbg_supin");
+        tenv.executeSql("select * from iceberg_insert006 ").print();
+        tenv.executeSql("CREATE TABLE IF NOT EXISTS iceberg_insert006(" +
                 "  `id`  INT NOT NULL," +
                 "  `data1`   INT," +
                 "  `data2`   INT," +
                 "  PRIMARY KEY(id) NOT ENFORCED" +
                 ") with('format-version' = '2','write.upsert.enable'='true','write.upsert-part.enable'='true')");
-        tenv.executeSql("insert into iceberg_insert2 values(1,2,3),(2,3,4),(3,4,5)");
-        tenv.executeSql("select * from iceberg_insert2 ").print();
+        tenv.executeSql("insert into iceberg_insert006 values(1,2,3),(2,3,4),(3,4,5)");
+        tenv.executeSql("select * from iceberg_insert006 ").print();
     }
 
     /**
@@ -198,6 +206,8 @@ public class demo {
                 .table(table)
                 .tableLoader(tableLoader)
                 .streaming(true)
+                //"monitor-interval","10s"; 需要传入一个map，其实也可以把所有其他的参数都传到里面，效果是一样的
+                .properties(new HashMap<>())
                 //.startSnapshotId(snapshots.get(snapshots.size() - 1))
                 .build().print();
 
@@ -371,6 +381,26 @@ public class demo {
         env.execute("test with sql datastream");
     }
 
+    @Test
+    public void TestMonitor() throws Exception {
+
+        //目前删除表可能不会清除所有目录，所以每次测试最好重新建表，结果更加清晰
+        TABLE_NAME = "iceberg_monitor2";
+
+        //iceberg可以通过时间来创建隐藏分区，但目前flink不支持直接建表就创建这样的分区
+        tenv.executeSql("CREATE TABLE IF NOT EXISTS "+TABLE_NAME+"(" +
+                "  `id`  INT NOT NULL," +
+                "  `data1`   INT," +
+                "  `data2`   INT," +
+                "  PRIMARY KEY(id) NOT ENFORCED" +
+                ") with('format-version' = '2','write.upsert.enable'='true','write.upsert-part.enable'='true')");
+
+
+        for(int i = 0; i <= 100; i++){
+            tenv.executeSql("insert into iceberg_monitor2 values(1,2,3),(1,3,4),(1,4,5),(1,5,6)");
+            Thread.sleep(5000);
+        }
+    }
 }
 
 

@@ -88,7 +88,7 @@ public class TestUpsert extends FlinkCatalogTestBase {
                 StreamExecutionEnvironment env = StreamExecutionEnvironment
                         .getExecutionEnvironment(MiniClusterResource.DISABLE_CLASSLOADER_CHECK_CONFIG);
                 env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-                env.enableCheckpointing(6000);
+                env.enableCheckpointing(300);
                 env.setMaxParallelism(2);
                 env.setParallelism(2);
                 tEnv = StreamTableEnvironment.create(env, settingsBuilder.build());
@@ -188,6 +188,43 @@ public class TestUpsert extends FlinkCatalogTestBase {
 //                String.format("select * from %s /*+ OPTIONS('streaming'='true', 'monitor-interval'='10s')*/",
 //                        TABLE_NAME));
         org.apache.flink.table.api.Table sqlQuery = tEnv.sqlQuery(String.format("select * from %s /*+ OPTIONS('streaming'='true', 'monitor-interval'='10s')*/",
+                TABLE_NAME));
+        DataStream<Row> rowDataStream = tEnv.toChangelogStream(sqlQuery);
+        StreamExecutionEnvironment env = rowDataStream.getExecutionEnvironment();
+        rowDataStream.print();
+        env.execute();
+
+    }
+
+    @Test
+    public void TestWithOneInsertChangeTwiceBatch() throws Exception {
+
+        Table table = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, TABLE_NAME));
+
+        sql("insert into %s values(1,2,3),(2,3,4),(3,4,5)", TABLE_NAME);
+
+//        sql("insert into %s(id, data1) values(1,8),(1,9),(2,10),(2,11),(3,23)", TABLE_NAME);
+
+//        SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
+//                createRecord(1, 9, 3),
+//                createRecord(2, 11, 4),
+//                createRecord(3, 23, 5)
+//        ));
+
+//        sql("insert into %s(id, data2) values(1,30),(1,40),(2,50),(2,60),(3,12),(3,13)", TABLE_NAME);
+        sql("insert into %s(id, data2) values(1,30),(1,40),(1,50),(1,60),(1,12),(1,13)", TABLE_NAME);
+
+        // Assert the table records as expected.
+//        SimpleDataUtil.assertTableRecords(table, Lists.newArrayList(
+//                createRecord(1, 9, 40),
+//                createRecord(2, 11, 60),
+//                createRecord(3, 23, 13)
+//        ));
+
+//        tEnv.executeSql(
+//                String.format("select * from %s /*+ OPTIONS('streaming'='true', 'monitor-interval'='10s')*/",
+//                        TABLE_NAME));
+        org.apache.flink.table.api.Table sqlQuery = tEnv.sqlQuery(String.format("select * from %s /*+ OPTIONS('streaming'='true')*/",
                 TABLE_NAME));
         DataStream<Row> rowDataStream = tEnv.toChangelogStream(sqlQuery);
         StreamExecutionEnvironment env = rowDataStream.getExecutionEnvironment();

@@ -141,6 +141,58 @@ public class TestStreamBatchConsume extends FlinkCatalogTestBase {
         sql("CREATE TABLE %s (id int, data1 int, data2 int, PRIMARY KEY(id) NOT ENFORCED) " +
                 "with('format-version' = '2','write.upsert.enable'='true','write.upsert-part.enable'='true')", TABLE_NAME);
 
+        Table table = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, TABLE_NAME));
+
+        sql("insert into %s values(1,2,3),(2,3,4),(3,4,5)", TABLE_NAME);
+
+        // snapshot 2
+        sql("insert into %s values(1,3,5),(2,4,6),(3,5,7)", TABLE_NAME);
+
+        sql("insert into %s values(4,5,6),(5,6,7),(6,7,8)", TABLE_NAME);
+
+        // snapshot 4
+        sql("insert into %s(id, data1) values(4,100),(5,200),(6,300)", TABLE_NAME);
+
+        table.refresh();
+        List<Long> ancestors = SnapshotUtil.currentAncestors(table);
+        long snapshotId1 = ancestors.get(ancestors.size() - 1);
+        long snapshotId3 = ancestors.get(ancestors.size() - 3);
+        long snapshotId4 = ancestors.get(ancestors.size() - 4);
+
+        List<Record> expected2 = Lists.newArrayList(
+                createRecord(1, 3,5),
+                createRecord(2, 4,6),
+                createRecord(3, 5,7),
+
+                createRecord(4, 5,6),
+                createRecord(5, 6,7),
+                createRecord(6, 7,8)
+        );
+        TestHelpers.assertRecords(runWithOptions(
+                ImmutableMap.<String, String>builder()
+                        .put("streaming", "false")
+                        .put("start-snapshot-id", Long.toString(snapshotId1))
+                        .put("end-snapshot-id", Long.toString(snapshotId3)).build()),
+                expected2, SCHEMA);
+
+        tEnv.executeSql(String.format("select * from %s /*+ OPTIONS('streaming'='false','start-snapshot-id'='%s','end-snapshot-id'='%s')*/",
+                TABLE_NAME, Long.toString(snapshotId1), Long.toString(snapshotId3))).print();
+
+
+        List<Record> expected3 = Lists.newArrayList(
+                createRecord(4, 100,6),
+                createRecord(5, 200,7),
+                createRecord(6, 300,8)
+        );
+        TestHelpers.assertRecords(runWithOptions(
+                ImmutableMap.<String, String>builder()
+                        .put("streaming", "false")
+                        .put("start-snapshot-id", Long.toString(snapshotId3))
+                        .put("end-snapshot-id", Long.toString(snapshotId4)).build()),
+                expected3, SCHEMA);
+
+        tEnv.executeSql(String.format("select * from %s /*+ OPTIONS('streaming'='false','start-snapshot-id'='%s','end-snapshot-id'='%s')*/",
+                TABLE_NAME, Long.toString(snapshotId3), Long.toString(snapshotId4))).print();
     }
 
     @Test
@@ -285,6 +337,35 @@ public class TestStreamBatchConsume extends FlinkCatalogTestBase {
                 String.format("select * from %s /*+ OPTIONS('streaming'='true', 'start-snapshot-id'='%s', 'monitor-interval'='5s')*/",
                         TABLE_NAME, Long.toString(snapshotId1))).print();
 
+    }
+
+    @Test
+    public void TestWithPrimaryStream2() throws Exception {
+
+        sql("CREATE TABLE %s (id int, data1 int, data2 int, PRIMARY KEY(id) NOT ENFORCED) " +
+                "with('format-version' = '2','write.upsert.enable'='true')", TABLE_NAME);
+
+        Table table = validationCatalog.loadTable(TableIdentifier.of(icebergNamespace, TABLE_NAME));
+
+        sql("insert into %s values(1,2,3),(2,3,4),(3,4,5)", TABLE_NAME);
+
+        // snapshot 2
+        sql("insert into %s values(1,30,50),(2,44,66),(3,55,77)", TABLE_NAME);
+
+        sql("insert into %s values(1,521,623),(2,126,712),(3,547,865)", TABLE_NAME);
+
+        // snapshot 4
+        sql("insert into %s(id, data1) values(1,1002),(2,2030),(3,3040)", TABLE_NAME);
+
+        table.refresh();
+        List<Long> ancestors = SnapshotUtil.currentAncestors(table);
+        long snapshotId1 = ancestors.get(ancestors.size() - 1);
+        long snapshotId3 = ancestors.get(ancestors.size() - 3);
+        long snapshotId4 = ancestors.get(ancestors.size() - 4);
+
+        tEnv.executeSql(
+                String.format("select * from %s /*+ OPTIONS('streaming'='true', 'start-snapshot-id'='%s', 'monitor-interval'='5s')*/",
+                        TABLE_NAME, Long.toString(snapshotId3))).print();
 
     }
 

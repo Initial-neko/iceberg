@@ -97,10 +97,10 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
     try {
 
       if (upsertPart) {
-        //主键字段放在schema的第一个位置，以后可以扩增，schema中信息很丰富
         Set<Integer> fieldIds = table.schema().identifierFieldIds();
         Expression expression = Expressions.alwaysTrue();
 
+        // cc @RowDataWrapper can build this more greater
         RowType rowType = FlinkSchemaUtil.convert(schema);
         RowData.FieldGetter[] getters = new RowData.FieldGetter[row.getArity()];
         for (int i = 0; i < row.getArity(); i++) {

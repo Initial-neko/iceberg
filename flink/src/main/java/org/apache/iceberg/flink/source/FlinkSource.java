@@ -21,6 +21,10 @@ package org.apache.iceberg.flink.source;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -31,8 +35,12 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.data.RowData;
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.HistoryEntry;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.encryption.EncryptionManager;
 import org.apache.iceberg.expressions.Expression;
@@ -44,6 +52,9 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 
 public class FlinkSource {
+
+  private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
   private FlinkSource() {
   }
 
@@ -124,6 +135,28 @@ public class FlinkSource {
 
     public Builder startSnapshotId(Long startSnapshotId) {
       contextBuilder.startSnapshotId(startSnapshotId);
+      return this;
+    }
+
+    public Builder startTimeStamp(Long timestampMillis) {
+
+      Long lastSnapshotId = null;
+      Iterable<Snapshot> snapshots = table.snapshots();
+      /*for(Snapshot s : snapshots){
+        System.out.println(s.snapshotId() + " " + s.timestampMillis());
+      }*/
+      for(Snapshot s : snapshots){
+        if(s.timestampMillis() <= timestampMillis){
+          lastSnapshotId = s.snapshotId();
+        }
+      }
+//      System.out.println("last is " + lastSnapshotId);
+      // the snapshot ID could be null if no entries were older than the requested time. in that case,
+      // there is no valid snapshot to read.
+      Preconditions.checkArgument(lastSnapshotId != null,
+              "Cannot find a snapshot older than %s", formatTimestampMillis(timestampMillis));
+
+      contextBuilder.startSnapshotId(lastSnapshotId);
       return this;
     }
 
@@ -251,5 +284,9 @@ public class FlinkSource {
 
   public static boolean isBounded(Map<String, String> properties) {
     return !ScanContext.builder().fromProperties(properties).build().isStreaming();
+  }
+
+  private static String formatTimestampMillis(long millis) {
+    return DATE_FORMAT.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.systemDefault()));
   }
 }

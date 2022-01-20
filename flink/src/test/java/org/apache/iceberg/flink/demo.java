@@ -56,7 +56,7 @@ public class demo {
 
     @Before
     public void init() {
-        System.setProperty("HADOOP_USER_NAME", "hdp_lbg_supin");
+        System.setProperty("HADOOP_USER_NAME", "hdp_teu_dpd");
         System.out.println(System.getProperty("HADOOP_USER_NAME") + " " + System.getenv("HADOOP_USER_NAME"));
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         org.apache.flink.configuration.Configuration conf = new org.apache.flink.configuration.Configuration();
@@ -369,7 +369,7 @@ public class demo {
 
         //注意 分区字段也属于upsert主键的一部分，upsert主键必须包括（主键 + 分区字段），不然会出现重复记录，那么下列的插入将会进入分区part2
 //        tenv.executeSql(String.format("insert into %s values(1,2,3,'part2'),(1,3,4,'part2'),(1,4,5,'part2'),(1,5,7,'part2'),(1,100,200,'part2')", TABLE_NAME));
-        tenv.executeSql(String.format("insert into %s(id, data1, data3) values(200,3,'part2'),(200,4,'part2'),(201,5,'part2'),(202,7,'part2'),(201,200,'part2')", TABLE_NAME));
+//        tenv.executeSql(String.format("insert into %s(id, data1, data3) values(200,3,'part2'),(200,4,'part2'),(201,5,'part2'),(202,7,'part2'),(201,200,'part2')", TABLE_NAME));
 
 
         //sql can add "start-snapshot-id"

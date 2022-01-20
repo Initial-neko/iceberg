@@ -342,6 +342,8 @@ public class TestStreamConsumeV1 {
                 .table(table1)
                 .tableLoader(tableLoader)
                 .streaming(true)
+                //要大于第一个快照的snapshot，不然效果等同于从头开始，找到最后一个快照timestamp比它小的就返回
+                .startTimeStamp(1641264751000L)
                 //.startSnapshotId(snapshots.get(snapshots.size() - 1))
                 //.endSnapshotId(snapshots.get(0))
                 //.project(projectedSchema)

@@ -62,9 +62,9 @@ public class Demo_batchWrite {
         org.apache.flink.configuration.Configuration conf = new org.apache.flink.configuration.Configuration();
         conf.setString("rest.port", "8081-8089");
         env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
-        env.setParallelism(1);
+        env.setParallelism(5);
         //flink写入iceberg需要打开checkpoint
-        env.enableCheckpointing(500);
+        env.enableCheckpointing(50000);
 
         tenv = StreamTableEnvironment.create(env);
         tenv.executeSql("create CATALOG iceberg_hive_catalog with" +

@@ -64,7 +64,7 @@ public class demo {
         env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
         env.setParallelism(1);
         //flink写入iceberg需要打开checkpoint
-        env.enableCheckpointing(500);
+        env.enableCheckpointing(5000);
 
         tenv = StreamTableEnvironment.create(env);
         tenv.executeSql("create CATALOG iceberg_hive_catalog with" +
@@ -111,15 +111,15 @@ public class demo {
     @Test
     public void test_createAndInsert() {
 //        System.setProperty("HADOOP_USER_NAME", "hdp_lbg_supin");
-        tenv.executeSql("select * from iceberg_insert006 ").print();
-        tenv.executeSql("CREATE TABLE IF NOT EXISTS iceberg_insert006(" +
+//        tenv.executeSql("select * from iceberg_insert007 ").print();
+        tenv.executeSql("CREATE TABLE IF NOT EXISTS iceberg_insert007(" +
                 "  `id`  INT NOT NULL," +
                 "  `data1`   INT," +
                 "  `data2`   INT," +
                 "  PRIMARY KEY(id) NOT ENFORCED" +
                 ") with('format-version' = '2','write.upsert.enable'='true','write.upsert-part.enable'='true')");
-        tenv.executeSql("insert into iceberg_insert006 values(1,2,3),(2,3,4),(3,4,5)");
-        tenv.executeSql("select * from iceberg_insert006 ").print();
+        tenv.executeSql("insert into iceberg_insert007 values(1,2,3),(2,3,4),(3,4,5)");
+        tenv.executeSql("select * from iceberg_insert007 ").print();
     }
 
     /**

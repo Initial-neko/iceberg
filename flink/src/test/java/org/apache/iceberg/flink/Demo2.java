@@ -52,7 +52,7 @@ public class Demo2 {
     HiveCatalog catalog = null;
     String warehouse = "hdfs://10.162.12.100:9000/home/hdp_teu_dpd/resultdata/ly60/iceberg/warehouse/hive_catalog";
     String TABLE_NAME = "iceberg_insert501";
-    int checkpoint = 600;
+    static int checkpoint = 10;
     static int ts_compare;
 
     @BeforeClass
@@ -67,7 +67,7 @@ public class Demo2 {
         org.apache.flink.configuration.Configuration conf = new org.apache.flink.configuration.Configuration();
         conf.setString("rest.port", "8081-8089");
         env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
-        env.setParallelism(1);
+        env.setParallelism(5);
 //flink写入iceberg需要打开checkpoint
         env.enableCheckpointing(checkpoint * 1000);
 //        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 1000));
@@ -114,6 +114,22 @@ public class Demo2 {
 //            out.collect("Window: " + context.window() + "count: " + count);
         }
     }
+
+    static class MyProcessWindowFunction2
+            extends ProcessWindowFunction<Tuple2<String, RowData>, String, String, TimeWindow> {
+
+        @Override
+        public void process(String key, Context context, Iterable<Tuple2<String, RowData>> input, Collector<String> out) {
+
+            ArrayList<Tuple2<String, RowData>> tuple2s = Lists.newArrayList(input);
+            count += tuple2s.size();
+
+            out.collect("count: " + count);
+
+//            out.collect("Window: " + context.window() + "count: " + count);
+        }
+    }
+
     static class MySourceFunction implements SourceFunction<Tuple3<Integer, Integer, Long>> {
 
         boolean isRunning = true;
@@ -122,12 +138,12 @@ public class Demo2 {
             while(isRunning){
                 Random random = new Random();
                 for(int i = 0; i < 10000; i++){
-                    int id = (int)(random.nextDouble() * 1000000 + 1);
-                    int data1 = (int)(random.nextGaussian() * 1000000 + 1);
+                    int id = (int)(random.nextDouble() * 20000 + 1);
+                    int data1 = (int)(random.nextGaussian() * 20000 + 1);
                     long timeStamp = System.currentTimeMillis();
                     ctx.collect(new Tuple3<>(id, data1, timeStamp));
                 }
-//                Thread.sleep(6000);
+//                Thread.sleep(checkpoint * 1000);
                 isRunning = false;
             }
         }
@@ -162,7 +178,7 @@ public class Demo2 {
     @Test
     public void TestDataStreamInsertTime() throws InterruptedException {
 
-        TABLE_NAME = "test_upsert_15";
+        TABLE_NAME = "test_upsert_17";
         tenv.executeSql("CREATE TABLE IF NOT EXISTS "+TABLE_NAME+"(" +
                 "  `id`  INT NOT NULL," +
                 "  `data1`   INT," +
@@ -170,6 +186,34 @@ public class Demo2 {
                 "  `ts`   BIGINT," +
                 "  PRIMARY KEY(id) NOT ENFORCED" +
                 ") with('format-version' = '2','write.upsert.enable'='true','write.upsert-part.enable'='true')");
+        DataStreamSource<Tuple3<Integer, Integer, Long>> dataStream = env.addSource(new MySourceFunction());
+
+        org.apache.flink.table.api.Table table = tenv.fromDataStream(dataStream,
+                Schema.newBuilder()
+                        .column("f0", "INT")
+                        .column("f1", "INT")
+                        .column("f2", "BIGINT")
+                        .build());
+        tenv.createTemporaryView("table", table);
+        catalog.loadTable(TableIdentifier.of(database, TABLE_NAME));
+        long start = System.currentTimeMillis();
+        tenv.executeSql(String.format("insert into %s(id, data1, ts) SELECT f0 as id, f1 as data1, f2 as ts from `table`", TABLE_NAME)).print();
+        long end = System.currentTimeMillis();
+        System.out.println("=========================== " + (double)(end - start) / 1000);
+        Thread.sleep(20000);
+    }
+
+    @Test
+    public void TestDataStreamInsertTime_noPart() throws InterruptedException {
+
+        TABLE_NAME = "test_upsert_18";
+        tenv.executeSql("CREATE TABLE IF NOT EXISTS "+TABLE_NAME+"(" +
+                "  `id`  INT NOT NULL," +
+                "  `data1`   INT," +
+                "  `data2`   INT," +
+                "  `ts`   BIGINT," +
+                "  PRIMARY KEY(id) NOT ENFORCED" +
+                ") with('format-version' = '2','write.upsert.enable'='true')");
         DataStreamSource<Tuple3<Integer, Integer, Long>> dataStream = env.addSource(new MySourceFunction());
 
         org.apache.flink.table.api.Table table = tenv.fromDataStream(dataStream,
@@ -261,7 +305,7 @@ public class Demo2 {
 
     @Test
     public void test_print2() throws Exception {
-        TABLE_NAME = "test_upsert_11";
+        TABLE_NAME = "test_upsert_17";
         tenv.executeSql("CREATE TABLE IF NOT EXISTS "+TABLE_NAME+"(" +
                 "  `id`  INT NOT NULL," +
                 "  `data1`   INT," +
@@ -301,14 +345,29 @@ public class Demo2 {
         Types.NestedField ts = schema.findField("ts");
         ts_compare = ts.fieldId();
 
-        DataStream<RowData> dataStream = FlinkSource.forRowData()
+        FlinkSource.forRowData()
                 .env(env)
                 .table(table)
                 .tableLoader(tableLoader)
                 .streaming(true)
                 .startSnapshotId(snapshots.get(0))
-                .build();
-//                .print();
+                .build()
+                .map(new MapFunction<RowData, Tuple2<String, RowData>>() {
+                    @Override
+                    public Tuple2<String, RowData> map(RowData rowData) throws Exception {
+                        StringBuilder group = new StringBuilder();
+                        for (Integer id : fieldIds) {
+                            //通过fieldIDS进行分组即可
+                            group.append(getters[id].getFieldOrNull(rowData) + "_");
+                        }
+//                        System.out.println(group + " " + rowData);
+                        return Tuple2.of("1", rowData);
+                    }
+                })
+                .keyBy(f -> f.f0)
+                .window(TumblingProcessingTimeWindows.of(Time.seconds(checkpoint)))
+                .process(new MyProcessWindowFunction2())
+                .print();
 
 //        rowDataStream.print();
 //        tenv.executeSql("select count(*) from "+TABLE_NAME+"").print();

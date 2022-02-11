@@ -62,7 +62,7 @@ public class Demo_batchWrite {
         org.apache.flink.configuration.Configuration conf = new org.apache.flink.configuration.Configuration();
         conf.setString("rest.port", "8081-8089");
         env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
-        env.setParallelism(5);
+        env.setParallelism(1);
         //flink写入iceberg需要打开checkpoint
         env.enableCheckpointing(50000);
 

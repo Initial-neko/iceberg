@@ -24,10 +24,17 @@ import com.bj58.dsap.api.scf.contract.Result;
 import com.bj58.dsap.api.scf.module.Put;
 import com.bj58.spat.scf.client.SCFInit;
 import com.bj58.spat.scf.client.proxy.builder.ProxyFactory;
+import com.bj58.spat.scf.protocol.serializer.SerializeBase;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.DefaultSerializers;
 import com.fasterxml.jackson.core.SerializableString;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,14 +42,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.io.input.CharSequenceInputStream;
+import org.apache.flink.api.common.typeutils.TypeSerializerUtils;
+import org.apache.flink.api.java.typeutils.runtime.KryoUtils;
+import org.apache.flink.api.java.typeutils.runtime.RowSerializer;
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.binary.BinaryRowData;
 import org.apache.flink.table.data.binary.BinaryStringData;
+import org.apache.flink.table.expressions.In;
 import org.apache.flink.table.factories.SerializationFormatFactory;
+import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.Row;
+import org.apache.flink.types.RowKind;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.PartitionKey;
@@ -83,6 +103,8 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
   public static final String tableName = "iceberg_index";
   public static final String columnFamily = "f1";
   static IHbaseApi service = null;
+  public static RowData.FieldGetter[] getters;
+  RowDataSerializer rowDataSerializer = null;
 
   BaseDeltaTaskWriter(PartitionSpec spec,
                       FileFormat format,
@@ -104,8 +126,10 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
     this.env = StreamExecutionEnvironment.getExecutionEnvironment();
     this.upsertPart = upsertPart;
     this.table = table;
+    System.setProperty("scf.serializer.basepakage", "com.bj58");
     SCFInit.initScfKeyByValue("qz9ZoZWTD2LyATBp4BHDM4bw2TtSqPLR");
     service = ProxyFactory.create(IHbaseApi.class, url);
+    rowDataSerializer = new RowDataSerializer(flinkSchema);
   }
 
   abstract RowDataDeltaWriter route(RowData row);
@@ -114,21 +138,96 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
     return wrapper;
   }
 
-  RowData getFromHbase(String id){
-    Result result = service.queryByRowKey(tableName, String.valueOf(id));
-    RowData value = (RowData)SerializationUtil.deserializeFromBase64((String)result.getScfMap().get(columnFamily + "value"));
-    return value;
+  public String serialize(RowData obj) throws IOException {
+
+//    System.out.println("start:" + obj);
+    long start = System.currentTimeMillis();
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputView dataOutputView = new DataOutputViewStreamWrapper(outputStream);
+
+    rowDataSerializer.serialize(obj , dataOutputView);
+    String outStr = "";
+//    dataOutputView.writeUTF(outStr);
+    outStr = outputStream.toString("UTF-8");
+//    System.out.println("out:" + outStr);
+    long end = System.currentTimeMillis();
+    System.out.println("serialize:" + (double)(end - start) / 1000);
+    return outStr;
   }
 
-  void writeToHbase(String id, RowData row){
+  public RowData deserialize(String srcStr) throws IOException {
+
+    long start = System.currentTimeMillis();
+    DataInputView dataInputView = new DataInputViewStreamWrapper(new CharSequenceInputStream(srcStr, StandardCharsets.UTF_8));
+    RowData rowData = rowDataSerializer.deserialize(dataInputView);
+    if(rowData instanceof BinaryRowData){
+      GenericRowData newRow = new GenericRowData(rowData.getRowKind(), rowData.getArity());
+      for (int i = 0; i < rowData.getArity(); i++) {
+        Object rowVal = getters[i].getFieldOrNull(rowData);
+        newRow.setField(i, rowVal);
+      }
+      rowData = newRow;
+    }
+//    System.out.println("deserialize:" + rowData);
+    long end = System.currentTimeMillis();
+    System.out.println("deserialize:" + (double)(end - start) / 1000);
+    return rowData;
+  }
+
+  //rowString +I(1,2,3)
+  /*GenericRowData deSerialize(String rowString){
+
+    GenericRowData row = new GenericRowData(RowKind.INSERT, getters.length);
+    //1,2,3)
+    String split = rowString.substring(3);
+    //1,2,3
+    String split2 = split.substring(0, split.length() - 1);
+    String[] values = split2.split(",");
+    for (int i = 0; i < row.getArity(); i++) {
+      row.setField(i, values[i]);
+    }
+    return row;
+  }*/
+
+  GenericRowData getFromHbase(String id) throws IOException {
+    long start = System.currentTimeMillis();
+
+    Result result = service.queryByRowKey(tableName, String.valueOf(id));
+    String value = (String)result.getScfMap().get(columnFamily + ":value");
+    GenericRowData row = null;
+    if(value != null){
+//      row = deSerialize(value);
+      row = (GenericRowData) deserialize(value);
+    }
+    long end = System.currentTimeMillis();
+    System.out.println("getFromHbase(deserialize):" + (double)(end - start) / 1000);
+    return row;
+  }
+
+  void writeToHbase(String id, RowData row) throws IOException {
     LinkedList<Put> rowInfo = new LinkedList<>();
     Put put = new Put();
     put.setRowKey(String.valueOf(id));
     put.setColumnName("value");
-    put.setColumnValue(SerializationUtil.serializeToBase64(row));
+
+    /*GenericRowData newRow = null;
+    if(row instanceof BinaryRowData){
+      newRow = new GenericRowData(row.getRowKind(), row.getArity());
+      for (int i = 0; i < row.getArity(); i++) {
+        Object rowVal = getters[i].getFieldOrNull(row);
+        newRow.setField(i, rowVal);
+      }
+      row = newRow;
+    }*/
+    put.setColumnValue(serialize(row));
+//    put.setColumnValue(((GenericRowData)row).toString());
     rowInfo.add(put);
     try {
+      long start = System.currentTimeMillis();
       service.insert(tableName, columnFamily, rowInfo);
+      long end = System.currentTimeMillis();
+      System.out.println("writeToHbase(insert):" + (double)(end - start) / 1000);
     } catch (Exception e) {
       System.out.println("hbase insert error");
       e.printStackTrace();
@@ -137,10 +236,10 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
 
   @Override
   public void write(RowData row) throws IOException {
+    long start = System.currentTimeMillis();
     RowDataDeltaWriter writer = route(row);
-    RowData raw = null;
+    GenericRowData raw = null;
     String id = "";
-
     try {
 
       if (upsertPart) {
@@ -148,10 +247,12 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
 
         // cc @RowDataWrapper can build this more greater
         RowType rowType = FlinkSchemaUtil.convert(schema);
-        RowData.FieldGetter[] getters = new RowData.FieldGetter[row.getArity()];
-        for (int i = 0; i < row.getArity(); i++) {
-          LogicalType type = rowType.getTypeAt(i);
-          getters[i] = RowData.createFieldGetter(type, i);
+        if(getters == null) {
+          getters = new RowData.FieldGetter[row.getArity()];
+          for (int i = 0; i < row.getArity(); i++) {
+            LogicalType type = rowType.getTypeAt(i);
+            getters[i] = RowData.createFieldGetter(type, i);
+          }
         }
 
         //主键为1个字段，这个时候循环只会执行一次
@@ -161,13 +262,18 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
           if(fieldVal instanceof BinaryStringData){
             fieldVal = fieldVal.toString();
           }
-          id = (String)fieldVal;
+          if(fieldVal instanceof Integer){
+            id = String.valueOf(fieldVal);
+          }else{
+            id = (String)fieldVal;
+          }
           raw = getFromHbase(id);
         }
         //采用hbase index来进行字段的更新
 
         if(raw != null) {
           GenericRowData newRow = new GenericRowData(row.getRowKind(), row.getArity());
+
           for (int i = 0; i < row.getArity(); i++) {
             Object rawVal = getters[i].getFieldOrNull(raw);
             Object rowVal = getters[i].getFieldOrNull(row);
@@ -211,6 +317,8 @@ abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
       default:
         throw new UnsupportedOperationException("Unknown row kind: " + row.getRowKind());
     }
+    long end = System.currentTimeMillis();
+    System.out.println("write:" + (double)(end - start) / 1000);
   }
 
 

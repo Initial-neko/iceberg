@@ -57,6 +57,14 @@ public class DataTableScan extends BaseTableScan {
   }
 
   @Override
+  public TableScan useManifests(Iterable<ManifestFile> manifests) {
+    Long scanSnapshotId = snapshotId();
+    Preconditions.checkState(scanSnapshotId == null,
+            "Cannot enable specific manifests scan, scan-snapshot set to id=%s", scanSnapshotId);
+    return new ManifestsDataTableScan(tableOps(), table(), schema(), context().useManifests(manifests));
+  }
+
+  @Override
   public TableScan appendsAfter(long fromSnapshotId) {
     Snapshot currentSnapshot = table().currentSnapshot();
     Preconditions.checkState(currentSnapshot != null, "Cannot scan appends after %s, there is no current snapshot",

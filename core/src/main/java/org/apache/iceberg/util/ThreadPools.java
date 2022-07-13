@@ -19,9 +19,12 @@
 
 package org.apache.iceberg.util;
 
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.SystemProperties;
 import org.apache.iceberg.relocated.com.google.common.util.concurrent.MoreExecutors;
 import org.apache.iceberg.relocated.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -46,6 +49,7 @@ public class ThreadPools {
               .setNameFormat("iceberg-worker-pool-%d")
               .build()));
 
+  private static final ConcurrentHashMap<String, ExecutorService> EXECUTOR_SERVICE_MAP = new ConcurrentHashMap<>();
   /**
    * Return an {@link ExecutorService} that uses the "worker" thread-pool.
    * <p>
@@ -57,8 +61,21 @@ public class ThreadPools {
    *
    * @return an {@link ExecutorService} that uses the worker pool
    */
-  public static ExecutorService getWorkerPool() {
-    return WORKER_POOL;
+  public synchronized static ExecutorService getWorkerPool() {
+    ExecutorService executorService = WORKER_POOL;
+    try {
+      String userName = UserGroupInformation.getCurrentUser().getShortUserName();
+      executorService = EXECUTOR_SERVICE_MAP.computeIfAbsent(userName, k -> Executors.newFixedThreadPool(
+              WORKER_THREAD_POOL_SIZE,
+              new ThreadFactoryBuilder()
+                      .setDaemon(true)
+                      .setNameFormat("iceberg-worker-pool-%d")
+                      .build()));
+
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return executorService;
   }
 
   private static int getPoolSize(String systemProperty, int defaultSize) {

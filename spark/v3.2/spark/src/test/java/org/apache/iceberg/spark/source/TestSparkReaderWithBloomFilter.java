@@ -23,9 +23,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
+
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
@@ -129,17 +128,22 @@ public class TestSparkReaderWithBloomFilter {
     GenericRecord record = GenericRecord.create(table.schema());
 
     for (int i = 0; i < INT_VALUE_COUNT; i += 1) {
-      records.add(record.copy(ImmutableMap.of(
-          "id", INT_MIN_VALUE + i,
-          "id_long", LONG_BASE + INT_MIN_VALUE + i,
-          "id_double", DOUBLE_BASE + INT_MIN_VALUE + i,
-          "id_float", FLOAT_BASE + INT_MIN_VALUE + i,
-          "id_string", BINARY_PREFIX + (INT_MIN_VALUE + i),
-          "id_boolean", (i % 2 == 0) ? true : false,
-          "id_date",  LocalDate.parse("2021-09-05"),
-          "id_int_decimal", new BigDecimal(String.valueOf(77.77)),
-          "id_long_decimal", new BigDecimal(String.valueOf(88.88)),
-          "id_fixed_decimal", new BigDecimal(String.valueOf(99.99)))));
+      final int val = i;
+      Map<String, Object> map = new HashMap<String ,Object>(){
+        {
+          put("id",INT_MIN_VALUE+val);
+          put("id_long",LONG_BASE+INT_MIN_VALUE+val);
+          put("id_double",DOUBLE_BASE+INT_MIN_VALUE+val);
+          put("id_float",FLOAT_BASE+INT_MIN_VALUE+val);
+          put("id_string",BINARY_PREFIX+(INT_MIN_VALUE+val));
+          put("id_boolean",(val %2==0)?true:false);
+          put("id_date",LocalDate.parse("2021-09-05"));
+          put("id_int_decimal",new BigDecimal(String.valueOf(77.77)));
+          put("id_long_decimal",new BigDecimal(String.valueOf(88.88)));
+          put("id_fixed_decimal",new BigDecimal(String.valueOf(99.99)));
+        }
+      };
+      records.add(record.copy(map));
     }
 
     this.dataFile = writeDataFile(Files.localOutput(temp.newFile()), Row.of(0), records);
@@ -318,4 +322,5 @@ public class TestSparkReaderWithBloomFilter {
 
     Assert.assertEquals("Table should contain expected rows", record.get(0), 250);
   }
+
 }

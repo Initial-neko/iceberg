@@ -41,6 +41,7 @@ final class TableScanContext {
   private final Long fromSnapshotId;
   private final Long toSnapshotId;
   private final Iterable<ManifestFile> manifests;
+  private final boolean streaming;
 
   TableScanContext() {
     this.snapshotId = null;
@@ -54,12 +55,13 @@ final class TableScanContext {
     this.fromSnapshotId = null;
     this.toSnapshotId = null;
     this.manifests = null;
+    this.streaming = false;
   }
 
   private TableScanContext(Long snapshotId, Expression rowFilter, boolean ignoreResiduals,
                            boolean caseSensitive, boolean colStats, Schema projectedSchema,
                            Collection<String> selectedColumns, ImmutableMap<String, String> options,
-                           Long fromSnapshotId, Long toSnapshotId, Iterable<ManifestFile> manifests) {
+                           Long fromSnapshotId, Long toSnapshotId, Iterable<ManifestFile> manifests, boolean isStreaming) {
     this.snapshotId = snapshotId;
     this.rowFilter = rowFilter;
     this.ignoreResiduals = ignoreResiduals;
@@ -71,6 +73,7 @@ final class TableScanContext {
     this.fromSnapshotId = fromSnapshotId;
     this.toSnapshotId = toSnapshotId;
     this.manifests = manifests;
+    this.streaming = isStreaming;
   }
 
   Long snapshotId() {
@@ -79,7 +82,7 @@ final class TableScanContext {
 
   TableScanContext useSnapshotId(Long scanSnapshotId) {
     return new TableScanContext(scanSnapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   Expression rowFilter() {
@@ -88,7 +91,7 @@ final class TableScanContext {
 
   TableScanContext filterRows(Expression filter) {
     return new TableScanContext(snapshotId, filter, ignoreResiduals,
-            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   boolean ignoreResiduals() {
@@ -97,7 +100,7 @@ final class TableScanContext {
 
   TableScanContext ignoreResiduals(boolean shouldIgnoreResiduals) {
     return new TableScanContext(snapshotId, rowFilter, shouldIgnoreResiduals,
-            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   boolean caseSensitive() {
@@ -106,7 +109,16 @@ final class TableScanContext {
 
   TableScanContext setCaseSensitive(boolean isCaseSensitive) {
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            isCaseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests);
+            isCaseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests, streaming);
+  }
+
+  boolean streaming() {
+    return streaming;
+  }
+
+  TableScanContext setStreaming(boolean isStreaming) {
+    return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
+            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests, isStreaming);
   }
 
   boolean returnColumnStats() {
@@ -115,7 +127,7 @@ final class TableScanContext {
 
   TableScanContext shouldReturnColumnStats(boolean returnColumnStats) {
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, returnColumnStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, returnColumnStats, projectedSchema, selectedColumns, options, fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   Collection<String> selectedColumns() {
@@ -125,7 +137,7 @@ final class TableScanContext {
   TableScanContext selectColumns(Collection<String> columns) {
     Preconditions.checkState(projectedSchema == null, "Cannot select columns when projection schema is set");
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, colStats, null, columns, options, fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, colStats, null, columns, options, fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   Schema projectedSchema() {
@@ -135,7 +147,7 @@ final class TableScanContext {
   TableScanContext project(Schema schema) {
     Preconditions.checkState(selectedColumns == null, "Cannot set projection schema when columns are selected");
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, colStats, schema, null, options, fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, colStats, schema, null, options, fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   Map<String, String> options() {
@@ -147,7 +159,7 @@ final class TableScanContext {
     builder.putAll(options);
     builder.put(property, value);
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, colStats, projectedSchema, selectedColumns, builder.build(), fromSnapshotId, toSnapshotId, manifests);
+            caseSensitive, colStats, projectedSchema, selectedColumns, builder.build(), fromSnapshotId, toSnapshotId, manifests, streaming);
   }
 
   Long fromSnapshotId() {
@@ -156,7 +168,7 @@ final class TableScanContext {
 
   TableScanContext fromSnapshotId(long id) {
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, colStats, projectedSchema, selectedColumns, options, id, toSnapshotId, manifests);
+            caseSensitive, colStats, projectedSchema, selectedColumns, options, id, toSnapshotId, manifests, streaming);
   }
 
   Long toSnapshotId() {
@@ -165,7 +177,7 @@ final class TableScanContext {
 
   TableScanContext toSnapshotId(long id) {
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals,
-            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, id, manifests);
+            caseSensitive, colStats, projectedSchema, selectedColumns, options, fromSnapshotId, id, manifests, streaming);
   }
 
   Iterable<ManifestFile> manifests() {
@@ -174,6 +186,6 @@ final class TableScanContext {
 
   TableScanContext useManifests(Iterable<ManifestFile> scanManifests) {
     return new TableScanContext(snapshotId, rowFilter, ignoreResiduals, caseSensitive, colStats, projectedSchema,
-            selectedColumns, options, fromSnapshotId, toSnapshotId, scanManifests);
+            selectedColumns, options, fromSnapshotId, toSnapshotId, scanManifests, streaming);
   }
 }

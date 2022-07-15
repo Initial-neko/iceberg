@@ -57,6 +57,10 @@ class FlinkSplitGenerator {
       scan = scan.asOfTime(context.asOfTimestamp());
     }
 
+    if (context.isStreaming()) {
+      scan = scan.streaming(true);
+    }
+
     if (context.startSnapshotId() != null) {
       if (context.endSnapshotId() != null) {
         scan = scan.appendsBetween(context.startSnapshotId(), context.endSnapshotId());

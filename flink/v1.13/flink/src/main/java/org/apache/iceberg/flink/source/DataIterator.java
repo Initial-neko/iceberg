@@ -86,9 +86,10 @@ public class DataIterator<T> implements CloseableIterator<T> {
         if (next.file().recordCount() == 0) {
           currentDeleteIterator.close();
           currentDeleteIterator = openDeleteTaskIterator(next);
+        }else {
+          currentIterator.close();
+          currentIterator = openTaskIterator(next);
         }
-        currentIterator.close();
-        currentIterator = openTaskIterator(next);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);

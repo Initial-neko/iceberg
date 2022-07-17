@@ -100,11 +100,11 @@ public class RowDataFileScanTaskReader implements FileScanTaskReader<RowData> {
             newEqDeleteIterable(task, deletes.requiredSchema(), idToConstant, inputFilesDecryptor);
 
     // Project the RowData to remove the extra meta columns.
-    if (!projectedSchema.sameSchema(deletes.requiredSchema())) {
+//    if (!projectedSchema.sameSchema(deletes.requiredSchema())) {
       RowDataProjection rowDataProjection = RowDataProjection.create(
               deletes.requiredRowType(), deletes.requiredSchema().asStruct(), projectedSchema.asStruct());
       iterable = CloseableIterable.transform(iterable, rowDataProjection::wrapDelete);
-    }
+//    }
 
     return iterable.iterator();
   }
@@ -312,6 +312,7 @@ public class RowDataFileScanTaskReader implements FileScanTaskReader<RowData> {
     FlinkDeleteFilter(FileScanTask task, Schema tableSchema, Schema requestedSchema,
                       InputFilesDecryptor inputFilesDecryptor) {
       super(task.file().path().toString(), task.deletes(), tableSchema, requestedSchema);
+      System.out.println(task.file().path() + "~~~~~~~~~~!");
       this.requiredRowType = FlinkSchemaUtil.convert(requiredSchema());
       this.asStructLike = new RowDataWrapper(requiredRowType, requiredSchema().asStruct());
       this.inputFilesDecryptor = inputFilesDecryptor;

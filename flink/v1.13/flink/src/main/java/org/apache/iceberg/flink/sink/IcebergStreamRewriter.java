@@ -33,7 +33,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.flink.TableLoader;
-import org.apache.iceberg.flink.source.DataIterator2;
+import org.apache.iceberg.flink.source.DataIterator;
 import org.apache.iceberg.flink.source.RowDataFileScanTaskReader;
 import org.apache.iceberg.io.TaskWriter;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
@@ -98,7 +98,7 @@ class IcebergStreamRewriter extends AbstractStreamOperator<RewriteResult>
 
     private RewriteResult rewrite(long snapshotId, StructLike partition, CombinedScanTask task) throws IOException {
         TaskWriter<RowData> writer = taskWriterFactory.create();
-        try (DataIterator2<RowData> iterator = new DataIterator2<>(rowDataReader, task, table.io(), table.encryption())) {
+        try (DataIterator<RowData> iterator = new DataIterator<>(rowDataReader, task, table.io(), table.encryption())) {
             while (iterator.hasNext()) {
                 RowData rowData = iterator.next();
                 writer.write(rowData);

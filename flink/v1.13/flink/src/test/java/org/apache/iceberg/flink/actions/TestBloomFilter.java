@@ -20,46 +20,25 @@
 
 package org.apache.iceberg.flink.actions;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import com.sun.rowset.internal.InsertRow;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.flink.configuration.CoreOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.iceberg.*;
-import org.apache.iceberg.actions.RewriteDataFilesActionResult;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.data.GenericAppenderFactory;
-import org.apache.iceberg.data.GenericRecord;
-import org.apache.iceberg.data.Record;
-import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.flink.FlinkCatalogTestBase;
-import org.apache.iceberg.flink.SimpleDataUtil;
 import org.apache.iceberg.flink.source.BoundedTableFactory;
 import org.apache.iceberg.hive.HiveCatalog;
-import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
-import org.apache.iceberg.relocated.com.google.common.collect.Lists;
-import org.apache.iceberg.types.Types;
-import org.junit.*;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.Before;
+import org.junit.Test;
 
-import static org.apache.iceberg.flink.SimpleDataUtil.RECORD;
+import java.util.HashMap;
+import java.util.List;
 
-public class TestIncrementalReading {
+public class TestBloomFilter {
 
     static StreamExecutionEnvironment env = null;
     static StreamTableEnvironment tenv = null;
@@ -109,58 +88,23 @@ public class TestIncrementalReading {
         configuration.setString("table.dynamic-table-options.enabled", "true");
     }
 
-    @Test
-    public void test_source(){
-        List<List<Row>> elementsPerCheckpoint = ImmutableList.of(
-                ImmutableList.of(
-                        deleteRow(1, 2, 6),
-                        deleteRow(2, 3, 7),
-                        deleteRow(3, 4, 8)
-                )
-                /*ImmutableList.of(
-                        deleteRow(2, 3, 7)
-                ),
-                ImmutableList.of(
-                        deleteRow(3, 4, 8)
-                )*/
-        );
-
-        String data_id = BoundedTableFactory.registerDataSet(elementsPerCheckpoint);
-        tenv.executeSql("CREATE TABLE source(" +
-                "  `id`  INT NOT NULL," +
-                "  `data1`   INT," +
-                "  `data2`   INT" +
-                ") with('connector'='BoundedSource', 'data-id'='"+data_id+"')");
-        tenv.executeSql("select * from source").print();
-    }
 
     public static void main(String[] args) throws InterruptedException {
         init();
         List<List<Row>> elementsPerCheckpoint = ImmutableList.of(
-                /*ImmutableList.of(
-                        insertRow(1,2,3),
-                        insertRow(2,3,4),
-                        insertRow(3,4,5),
-                        insertRow(1,2,4),
-                        insertRow(2,3,5),
-                        insertRow(3,4,6),
-                        insertRow(1,2,6),
-                        insertRow(2,3,7),
-                        insertRow(3,4,8)
-                ),*/
+
 
                 ImmutableList.of(
-                        deleteRow(1, 2, 6),
-                        deleteRow(2, 3, 7),
-                        deleteRow(3, 4, 8),
-                        deleteRow(4, 5, 6)
+                        deleteRow(1, 2, 6),  //ok
+                        deleteRow(2, 3, 7),  //ok
+                        deleteRow(3, 4, 8),  //ok
+                        deleteRow(7, 4, 8),  //ok
+                        deleteRow(5, 4, 8),  //ok
+                        deleteRow(9, 4, 8),
+                        deleteRow(11, 4, 8),
+                        deleteRow(31, 4, 8)
                 )
-                /*ImmutableList.of(
-                        deleteRow(2, 3, 7)
-                ),
-                ImmutableList.of(
-                        deleteRow(3, 4, 8)
-                )*/
+
         );
 
         String data_id = BoundedTableFactory.registerDataSet(elementsPerCheckpoint);
@@ -173,34 +117,31 @@ public class TestIncrementalReading {
         tenv.useCatalog("iceberg_hadoop_catalog");
         tenv.useDatabase("hdp_teu_dpd_default_stream_db1");
 
-        tableName = tableName + (int)(Math.random() * 10000 + 1);
+        tableName = tableName + (int)(Math.random() * 1000000 + 1);
         tenv.executeSql("CREATE TABLE IF NOT EXISTS "+tableName+"(" +
                 "  `id`  INT NOT NULL," +
                 "  `data1`   INT," +
                 "  `data2`   INT," +
                 "  PRIMARY KEY(id) NOT ENFORCED" +
                 ") with('format-version' = '2','write.upsert.enabled'='true')");
-        tenv.executeSql("insert into "+tableName+" values(1,2,3),(2,3,4),(3,4,5)");
+        HiveCatalog catalog = getCatalog();
+        Table table = catalog.loadTable(TableIdentifier.of(database, tableName));
+        // load and unload , the debug output is different
+        // unload, all delete records; load only contains specific dataFile record
+        table.updateProperties()
+                .set(TableProperties.PARQUET_BLOOM_FILTER_COLUMN_ENABLED_PREFIX + "id", "true")
+                .commit();
+        tenv.executeSql("insert into "+tableName+" values(1,2,3),(2,3,4),(3,4,5),(4,5,6),(5,6,7),(7,8,9)");
         Thread.sleep(3000);
-        tenv.executeSql("insert into "+tableName+" values(1,2,4),(2,3,5),(3,4,6)");
-        Thread.sleep(3000);
-        tenv.executeSql("insert into "+tableName+" values(1,2,6),(2,3,7),(3,4,8)");
-        Thread.sleep(3000);
-
 
         tenv.executeSql("insert into "+tableName+" select * from default_catalog.default_database.source");
         Thread.sleep(3000);
-        HiveCatalog catalog = getCatalog();
-        Table table = catalog.loadTable(TableIdentifier.of(database, tableName));
-        System.out.println(table.schema().identifierFieldIds() + "~~~~~~~~~~~");
-        //must all inserts is ok
+
         table.refresh();
         table.snapshots().forEach(System.out::println);
-        Iterable<Snapshot> snapshots = table.snapshots();
-        Snapshot snapshot = snapshots.iterator().next();
 
-        tenv.executeSql("select * from "+tableName+"/*+OPTIONS('streaming'='true','monitor-interval'='3s'," +
-                "'start-snapshot-id'='"+snapshot.snapshotId()+"')*/").print();
+        //mark(debug) delete filter to see the final Predicate
+        tenv.executeSql("select * from "+tableName).print();
     }
 
     protected static Row insertRow(Object... values) {

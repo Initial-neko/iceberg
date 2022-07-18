@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.LongStream;
 import org.apache.iceberg.deletes.PositionDelete;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
@@ -367,7 +368,9 @@ public class TableTestBase {
       expectedFilePaths.add(file.path());
     }
     Set<CharSequence> actualFilePaths = Sets.newHashSet();
-    for (FileScanTask task : tbl.newScan().planFiles()) {
+    CloseableIterable<FileScanTask> fileScanTasks = tbl.newScan().planFiles();
+    fileScanTasks.forEach(task -> System.out.println(task.file().path()));
+    for (FileScanTask task : fileScanTasks) {
       actualFilePaths.add(task.file().path());
     }
     Assert.assertEquals("Files should match", expectedFilePaths, actualFilePaths);

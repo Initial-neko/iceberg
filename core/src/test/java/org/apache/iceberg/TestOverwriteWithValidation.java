@@ -280,6 +280,10 @@ public class TestOverwriteWithValidation extends TableTestBase {
         .validateNoConflictingData()
         .commit();
 
+    /*table.snapshots().forEach(System.out::println);
+    table.currentSnapshot().allManifests().forEach(System.out::println);
+    table.newScan().planFiles().forEach(task -> System.out.println(task.file().path()));*/
+
     validateTableFiles(table, FILE_DAY_1, FILE_DAY_2_MODIFIED);
   }
 

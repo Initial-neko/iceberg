@@ -296,7 +296,7 @@ class ManifestGroup {
         matchingManifests,
         manifest -> {
           CloseableIterable<ManifestEntry<DataFile>> entries;
-          if (manifest.addedRowsCount() == 0) {
+          if (manifest.addedRowsCount() == 0 && manifest.deletedFilesCount() == 0) {
             GenericManifestEntry<DataFile> tmpManifestEntry = new GenericManifestEntry<>(table.spec().partitionType());
             tmpManifestEntry.wrapAppend(table.currentSnapshot().snapshotId(), table.currentSnapshot().sequenceNumber(),
                     tmpDataFile());

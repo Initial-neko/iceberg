@@ -95,7 +95,7 @@ public class DataTableScan extends BaseTableScan {
         .select(colStats ? SCAN_WITH_STATS_COLUMNS : SCAN_COLUMNS)
         .filterData(rowFilter)
         .specsById(ops.current().specsById())
-        .ignoreDeleted();
+        .ignoreDeleted().table(table());
 
     if (ignoreResiduals) {
       manifestGroup = manifestGroup.ignoreResiduals();

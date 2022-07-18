@@ -135,10 +135,11 @@ public class TestIncrementalDataTableScan extends TableTestBase {
     filesMatch(Lists.newArrayList("I"), appendsBetweenScan(7, 8));
 
     overwrite(table.newOverwrite(), files("H"), files("E")); // 9
-    AssertHelpers.assertThrows(
+    filesMatch(Lists.newArrayList("H"), appendsBetweenScan(8, 9));
+    /*AssertHelpers.assertThrows(
         "Overwrites are not supported for Incremental scan", UnsupportedOperationException.class,
         "Found overwrite operation, cannot support incremental data in snapshots (8, 9]",
-        () -> appendsBetweenScan(8, 9));
+        () -> appendsBetweenScan(8, 9));*/
   }
 
   @Test

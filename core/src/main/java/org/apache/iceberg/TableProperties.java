@@ -289,4 +289,15 @@ public class TableProperties {
 
   public static final String UPSERT_ENABLED = "write.upsert.enabled";
   public static final boolean UPSERT_ENABLED_DEFAULT = false;
+
+  public static final String STREAMING_REWRITE_ENABLE = "flink.rewrite.enable";
+  public static final boolean STREAMING_REWRITE_ENABLE_DEFAULT = false;
+
+  public static final String STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES = "flink.rewrite.target-file-size-bytes";
+
+  public static final String STREAMING_REWRITE_MAX_GROUP_FILES = "flink.rewrite.max-group-files";
+  public static final int STREAMING_REWRITE_MAX_GROUP_FILES_DEFAULT = Integer.MAX_VALUE;
+
+  public static final String STREAMING_REWRITE_MIN_FILE_SIZE_BYTES = "flink.rewrite.min-file-size-bytes";
+  public static final double STREAMING_REWRITE_MIN_FILE_SIZE_DEFAULT_RATIO = 0.75d;
 }

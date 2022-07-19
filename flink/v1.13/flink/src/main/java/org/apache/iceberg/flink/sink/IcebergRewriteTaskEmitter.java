@@ -69,6 +69,8 @@ import org.apache.iceberg.util.TableScanUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.iceberg.TableProperties.*;
+
 public class IcebergRewriteTaskEmitter extends AbstractStreamOperator<RewriteTask>
         implements OneInputStreamOperator<CommitResult, RewriteTask> {
 
@@ -369,14 +371,14 @@ public class IcebergRewriteTaskEmitter extends AbstractStreamOperator<RewriteTas
 
         private StreamingBinPackStrategy() {
             this.targetFileSize = PropertyUtil.propertyAsLong(table.properties(),
-                    FlinkSinkOptions.STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES,
+                    STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES,
                     PropertyUtil.propertyAsLong(table.properties(),
                             TableProperties.WRITE_TARGET_FILE_SIZE_BYTES,
                             TableProperties.WRITE_TARGET_FILE_SIZE_BYTES_DEFAULT));
 
             this.minFileSize = PropertyUtil.propertyAsLong(table.properties(),
-                    FlinkSinkOptions.STREAMING_REWRITE_MIN_FILE_SIZE_BYTES,
-                    (long) (targetFileSize * FlinkSinkOptions.STREAMING_REWRITE_MIN_FILE_SIZE_DEFAULT_RATIO));
+                    STREAMING_REWRITE_MIN_FILE_SIZE_BYTES,
+                    (long) (targetFileSize * STREAMING_REWRITE_MIN_FILE_SIZE_DEFAULT_RATIO));
 
             this.maxFileSize = PropertyUtil.propertyAsLong(table.properties(),
                     FlinkSinkOptions.STREAMING_REWRITE_MAX_FILE_SIZE_BYTES,
@@ -389,8 +391,8 @@ public class IcebergRewriteTaskEmitter extends AbstractStreamOperator<RewriteTas
                     FlinkSinkOptions.STREAMING_REWRITE_MIN_GROUP_FILES_DEFAULT);
 
             this.maxGroupFiles = PropertyUtil.propertyAsInt(table.properties(),
-                    FlinkSinkOptions.STREAMING_REWRITE_MAX_GROUP_FILES,
-                    FlinkSinkOptions.STREAMING_REWRITE_MAX_GROUP_FILES_DEFAULT);
+                    STREAMING_REWRITE_MAX_GROUP_FILES,
+                    STREAMING_REWRITE_MAX_GROUP_FILES_DEFAULT);
 
             this.maxWaitingCommits = PropertyUtil.propertyAsInt(table.properties(),
                     FlinkSinkOptions.STREAMING_REWRITE_MAX_WAITING_COMMITS,
@@ -496,22 +498,22 @@ public class IcebergRewriteTaskEmitter extends AbstractStreamOperator<RewriteTas
         private void validateOptions() {
             Preconditions.checkArgument(minFileSize >= 0,
                     "Cannot set %s to a negative number, %d < 0",
-                    FlinkSinkOptions.STREAMING_REWRITE_MIN_FILE_SIZE_BYTES, minFileSize);
+                    STREAMING_REWRITE_MIN_FILE_SIZE_BYTES, minFileSize);
 
             Preconditions.checkArgument(maxFileSize > minFileSize,
                     "Cannot set %s greater than or equal to %s, %d >= %d",
-                    FlinkSinkOptions.STREAMING_REWRITE_MIN_FILE_SIZE_BYTES,
+                    STREAMING_REWRITE_MIN_FILE_SIZE_BYTES,
                     FlinkSinkOptions.STREAMING_REWRITE_MAX_FILE_SIZE_BYTES, minFileSize, maxFileSize);
 
             Preconditions.checkArgument(targetFileSize > minFileSize,
                     "Cannot set %s greater than or equal to %s, %d >= %d",
-                    FlinkSinkOptions.STREAMING_REWRITE_MIN_FILE_SIZE_BYTES,
-                    FlinkSinkOptions.STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES, minFileSize, targetFileSize);
+                    STREAMING_REWRITE_MIN_FILE_SIZE_BYTES,
+                    STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES, minFileSize, targetFileSize);
 
             Preconditions.checkArgument(targetFileSize < maxFileSize,
                     "Cannot set %s is greater than or equal to %s, %d >= %d",
                     FlinkSinkOptions.STREAMING_REWRITE_MAX_FILE_SIZE_BYTES,
-                    FlinkSinkOptions.STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES, maxFileSize, targetFileSize);
+                    STREAMING_REWRITE_TARGET_FILE_SIZE_BYTES, maxFileSize, targetFileSize);
 
             Preconditions.checkArgument(minGroupFiles > 0,
                     "Cannot set %s to a negative number, %d < 0",
@@ -520,7 +522,7 @@ public class IcebergRewriteTaskEmitter extends AbstractStreamOperator<RewriteTas
             Preconditions.checkArgument(maxGroupFiles > minGroupFiles,
                     "Cannot set %s is greater than or equal to %s, %d >= %d",
                     FlinkSinkOptions.STREAMING_REWRITE_MIN_GROUP_FILES,
-                    FlinkSinkOptions.STREAMING_REWRITE_MAX_GROUP_FILES, minGroupFiles, maxGroupFiles);
+                    STREAMING_REWRITE_MAX_GROUP_FILES, minGroupFiles, maxGroupFiles);
 
             Preconditions.checkArgument(maxWaitingCommits > 0,
                     "Cannot set %s to a negative number, %d < 0",

@@ -56,14 +56,7 @@ import org.apache.iceberg.util.PropertyUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
-import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
-import static org.apache.iceberg.TableProperties.UPSERT_ENABLED;
-import static org.apache.iceberg.TableProperties.UPSERT_ENABLED_DEFAULT;
-import static org.apache.iceberg.TableProperties.WRITE_DISTRIBUTION_MODE;
-import static org.apache.iceberg.TableProperties.WRITE_DISTRIBUTION_MODE_NONE;
-import static org.apache.iceberg.TableProperties.WRITE_TARGET_FILE_SIZE_BYTES;
-import static org.apache.iceberg.TableProperties.WRITE_TARGET_FILE_SIZE_BYTES_DEFAULT;
+import static org.apache.iceberg.TableProperties.*;
 
 public class FlinkSink {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkSink.class);
@@ -322,7 +315,7 @@ public class FlinkSink {
       SingleOutputStreamOperator<WriteResult> writerStream = appendWriter(distributeStream, flinkRowType);
 
       boolean rewriteEnabled = rewrite || PropertyUtil.propertyAsBoolean(table.properties(),
-              FlinkSinkOptions.STREAMING_REWRITE_ENABLE, FlinkSinkOptions.STREAMING_REWRITE_ENABLE_DEFAULT);
+              STREAMING_REWRITE_ENABLE, STREAMING_REWRITE_ENABLE_DEFAULT);
 
       // Add single-parallelism committer that commits files
       // after successful checkpoint or end of input

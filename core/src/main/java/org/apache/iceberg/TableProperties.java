@@ -287,7 +287,7 @@ public class TableProperties {
 
   public static final String MERGE_DISTRIBUTION_MODE = "write.merge.distribution-mode";
 
-  public static final String UPSERT_ENABLED = "write.upsert.enabled";
+  public static final String UPSERT_ENABLED = "write.upsert.enable";
   public static final boolean UPSERT_ENABLED_DEFAULT = false;
 
   public static final String STREAMING_REWRITE_ENABLE = "flink.rewrite.enable";

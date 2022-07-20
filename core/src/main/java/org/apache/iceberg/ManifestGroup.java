@@ -264,12 +264,12 @@ class ManifestGroup {
 
     Evaluator evaluator = getFileEvaluator();
 
-    if (streaming) {
+    /*if (streaming) {
       // use a tmpManifest to construct fileScanTask which contains equality delete files only
       ManifestFile tmpManifest = tmpManifestFile();
       // place the constructed manifest at first to ensure this task always emit first
       dataManifests.add(0, tmpManifest);
-    }
+    }*/
 
     Iterable<ManifestFile> matchingManifests = evalCache == null ? dataManifests :
         Iterables.filter(dataManifests, manifest -> evalCache.get(manifest.partitionSpecId()).eval(manifest));
@@ -296,35 +296,28 @@ class ManifestGroup {
         matchingManifests,
         manifest -> {
           CloseableIterable<ManifestEntry<DataFile>> entries;
-          if (manifest.addedRowsCount() == 0 && manifest.deletedFilesCount() == 0) {
-            GenericManifestEntry<DataFile> tmpManifestEntry = new GenericManifestEntry<>(table.spec().partitionType());
-            tmpManifestEntry.wrapAppend(table.currentSnapshot().snapshotId(), table.currentSnapshot().sequenceNumber(),
-                    tmpDataFile());
-            entries = CloseableIterable.withNoopClose(tmpManifestEntry);
-          } else {
-            ManifestReader<DataFile> reader = ManifestFiles.read(manifest, io, specsById)
-                    .filterRows(dataFilter)
-                    .filterPartitions(partitionFilter)
-                    .caseSensitive(caseSensitive)
-                    .select(columns);
+          ManifestReader<DataFile> reader = ManifestFiles.read(manifest, io, specsById)
+                  .filterRows(dataFilter)
+                  .filterPartitions(partitionFilter)
+                  .caseSensitive(caseSensitive)
+                  .select(columns);
 
-            entries = reader.entries();
-            if (ignoreDeleted) {
-              entries = reader.liveEntries();
-            }
-
-            if (ignoreExisting) {
-              entries = CloseableIterable.filter(entries,
-                      entry -> entry.status() != ManifestEntry.Status.EXISTING);
-            }
-
-            if (evaluator != null) {
-              entries = CloseableIterable.filter(entries,
-                      entry -> evaluator.eval((GenericDataFile) entry.file()));
-            }
-
-            entries = CloseableIterable.filter(entries, manifestEntryPredicate);
+          entries = reader.entries();
+          if (ignoreDeleted) {
+            entries = reader.liveEntries();
           }
+
+          if (ignoreExisting) {
+            entries = CloseableIterable.filter(entries,
+                    entry -> entry.status() != ManifestEntry.Status.EXISTING);
+          }
+
+          if (evaluator != null) {
+            entries = CloseableIterable.filter(entries,
+                    entry -> evaluator.eval((GenericDataFile) entry.file()));
+          }
+
+          entries = CloseableIterable.filter(entries, manifestEntryPredicate);
 
           return entryFn.apply(manifest, entries);
         });

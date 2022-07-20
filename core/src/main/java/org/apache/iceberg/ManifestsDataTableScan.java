@@ -72,7 +72,7 @@ public class ManifestsDataTableScan extends DataTableScan {
                 .select(colStats() ? SCAN_WITH_STATS_COLUMNS : SCAN_COLUMNS)
                 .filterData(filter())
                 .specsById(tableOps().current().specsById())
-                .ignoreDeleted();
+                .ignoreDeleted().table(table());
 
         if (shouldIgnoreResiduals()) {
             manifestGroup = manifestGroup.ignoreResiduals();

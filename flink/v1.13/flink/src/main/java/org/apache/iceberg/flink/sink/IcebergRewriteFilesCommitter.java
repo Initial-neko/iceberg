@@ -95,7 +95,7 @@ class IcebergRewriteFilesCommitter extends AbstractStreamOperator<Void>
             long sequenceNumber = table.snapshot(result.startingSnapshotId()).sequenceNumber();
             RewriteFiles rewriteFiles = table.newRewrite()
                     .validateFromSnapshot(result.startingSnapshotId())
-                    .rewriteFiles(result.rewrittenDataFiles(), result.addedDataFiles(), sequenceNumber);
+                    .rewriteFiles(result.rewrittenDataFiles(), result.addedDataFiles(), sequenceNumber, false);
             rewriteFiles.commit();
             LOG.info("Committed rewrite file groups in {} ms.", System.currentTimeMillis() - start);
         } catch (Exception e) {

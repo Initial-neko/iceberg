@@ -84,6 +84,7 @@ abstract class MergingSnapshotProducer<ThisT> extends SnapshotProducer<ThisT> {
   // update data
   private final List<DataFile> newFiles = Lists.newArrayList();
   private Long newFilesSequenceNumber;
+  private boolean needVerification = true;
   private final Map<Integer, List<DeleteFile>> newDeleteFilesBySpec = Maps.newHashMap();
   private final List<ManifestFile> appendManifests = Lists.newArrayList();
   private final List<ManifestFile> rewrittenAppendManifests = Lists.newArrayList();
@@ -313,7 +314,12 @@ abstract class MergingSnapshotProducer<ThisT> extends SnapshotProducer<ThisT> {
    */
   protected void validateNoNewDeletesForDataFiles(TableMetadata base, Long startingSnapshotId,
                                                   Iterable<DataFile> dataFiles) {
-    validateNoNewDeletesForDataFiles(base, startingSnapshotId, null, dataFiles, newFilesSequenceNumber != null);
+//    validateNoNewDeletesForDataFiles(base, startingSnapshotId, null, dataFiles, newFilesSequenceNumber != null);
+    if (this.needVerification) {
+      validateNoNewDeletesForDataFiles(base, startingSnapshotId, null, dataFiles,
+              newFilesSequenceNumber != null);
+    }
+
   }
 
   /**
@@ -401,6 +407,10 @@ abstract class MergingSnapshotProducer<ThisT> extends SnapshotProducer<ThisT> {
 
   protected void setNewFilesSequenceNumber(long sequenceNumber) {
     this.newFilesSequenceNumber = sequenceNumber;
+  }
+
+  protected void setNeedVerification(boolean needVerification) {
+    this.needVerification = needVerification;
   }
 
   private long startingSequenceNumber(TableMetadata metadata, Long staringSnapshotId) {
